@@ -12,4 +12,8 @@ A small, production-style Express + TypeScript starter with Prisma/Postgres, Zod
 4. Wait for “_Server running on port 3000_” in the logs.
 5. Verify the API health check:
    **_curl http://localhost:3000/health → {"status":"ok"}_**
-6. Run **npx prisma generate**
+
+### Prisma (local dev)
+
+- Start DB: `docker compose up -d db`
+- Generate client: `npx prisma generate` (re-run after schema changes)
