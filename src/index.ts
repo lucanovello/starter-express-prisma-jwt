@@ -1,3 +1,12 @@
+/**
+ * Application entrypoint.
+ * Middleware order:
+ * 1) express.json()  — parse JSON
+ * 2) (security middleware goes here in next step)
+ * 3) routes          — e.g., /health
+ * 4) notFound        — 404 JSON
+ * 5) errorHandler    — global JSON errors (must be last)
+ */
 import express from "express";
 import dotenv from "dotenv";
 import { notFound } from "./middleware/notFound.js";
