@@ -22,8 +22,12 @@
   "homepage": "https://github.com/lucanovello/starter-express-prisma-jwt#readme",
   "dependencies": {
     "@prisma/client": "^6.17.1",
+    "@types/cors": "^2.8.19",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {

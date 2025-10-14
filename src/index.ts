@@ -12,12 +12,14 @@ import dotenv from "dotenv";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { AppError } from "./lib/errors.js";
+import { registerSecurity } from "./middleware/security.js";
 
 dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
+registerSecurity(app);
 
 app.get("/health", (req, res, next) => {
   res.status(200).json({ status: "ok" });

@@ -15,5 +15,11 @@ A small, production-style Express + TypeScript starter with Prisma/Postgres, Zod
 
 ### Prisma (local dev)
 
-- Start DB: `docker compose up -d db`
-- Generate client: `npx prisma generate` (re-run after schema changes)
+- Start DB: `docker compose up -d db`.
+- Generate client: `npx prisma generate` (re-run after schema changes).
+
+### Security
+
+- Helmet adds standard security headers.
+- CORS is open in dev (origin: true). Tighten for prod by setting an allowlist.
+- Rate limit defaults to 100 req/min/IP; tune in src/middleware/security.ts.
