@@ -21,7 +21,7 @@ export function registerSecurity(app: Express): void {
     })
   );
 
-  // Basic rate limiting: 100 req/min/IP
+  // Basic rate limiting: 100 req/15min/IP
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000,
