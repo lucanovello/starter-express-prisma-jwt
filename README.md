@@ -1,27 +1,42 @@
-# starter-express-prisma-jwt
+# Starter: Express + TypeScript + Prisma (Postgres) + JWT
 
-[![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
+A hiring-manager-friendly Node API starter with:
 
-A small, production-style Express + TypeScript starter with Prisma/Postgres, Zod validation, JWT auth (access + rotating refresh), Pino logs, Vitest/Supertest tests, Docker, and GitHub Actions.
+- **Express 5 (TypeScript)**
+- **Prisma** ORM targeting **Postgres**
+- **JWT auth**: access + rotating refresh (with reuse detection)
+- **Security**: helmet, CORS (open in dev), basic rate limiting
+- **Clean error handling** via `AppError`
+- **Tests**: Vitest + Supertest (integration)
+- **Docker Compose** for the DB (local dev)
+- **GitHub Actions CI**: Postgres service, Prisma generate/migrate, run tests, build
 
-## Quick Start
+No frontend. Minimal surface area. Skimmable and runnable in minutes.
 
-1. Clone the repo and install **_Docker Desktop_**.
-2. Copy the default environment:
-   **_cp .env.example .env_**.
-3. Build and start the services (API + Postgres):
-   **_docker compose up --build_**
-4. Wait for “_Server running on port 3000_” in the logs.
-5. Verify the API health check:
-   **_curl http://localhost:3000/health → {"status":"ok"}_**
+---
 
-### Prisma (local dev)
+## Quick Start (local dev)
 
-- Start DB: `docker compose up -d db`.
-- Generate client: `npx prisma generate` (re-run after schema changes).
+Prereqs: Node 20+, Docker, Docker Compose.
 
-### Security
+```bash
+# 1) Clone and install
+git clone https://github.com/lucanovello/starter-express-prisma-jwt
+cd starter-express-prisma-jwt
+npm install
 
-- Helmet adds standard security headers.
-- CORS is open in dev (origin: true). Tighten for prod by setting an allowlist.
-- Rate limit defaults to 100 req/min/IP; tune in src/middleware/security.ts.
+# 2) Configure env
+cp .env.example .env
+# Edit .env with strong secrets (see ENV section below)
+
+# 3) Start Postgres (Docker)
+docker compose up -d db
+
+# 4) Prisma client & migrate schema
+npx prisma generate
+npx prisma migrate deploy
+
+# 5) Run the API in dev (watch)
+npm run dev
+# GET http://localhost:3000/health -> {"status":"ok"}
+```
