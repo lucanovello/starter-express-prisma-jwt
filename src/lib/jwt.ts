@@ -12,7 +12,7 @@ import { AppError } from "./errors.js";
 /** Public payload surface kept minimal & generic. */
 export type JwtClaims = Record<string, unknown>;
 
-/** Fetch a required env var or fail fast at boot (no silent misconfig). */
+/** Fetch a required env var or fail fast at boot. */
 function requireEnv(name: string): string {
   const v = process.env[name];
   if (!v) {

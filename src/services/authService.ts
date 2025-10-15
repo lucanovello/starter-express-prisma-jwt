@@ -1,11 +1,13 @@
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
+import { hashPassword } from "../lib/password.js";
 import { signAccess, signRefresh, verifyRefresh } from "../lib/jwt.js";
 import { verifyPassword } from "../lib/password.js";
 import { hashRefresh } from "../lib/tokenHash.js";
 
 export type LoginDTO = { email: string; password: string };
 export type Tokens = { accessToken: string; refreshToken: string };
+export type RegisterDTO = { email: string; password: string };
 
 export async function login({ email, password }: LoginDTO): Promise<Tokens> {
   const user = await prisma.user.findUnique({ where: { email } });
@@ -21,6 +23,24 @@ export async function login({ email, password }: LoginDTO): Promise<Tokens> {
     data: { userId: user.id, token: hashRefresh(refreshToken), valid: true },
   });
   return { accessToken, refreshToken };
+}
+
+export async function register({ email, password }: RegisterDTO) {
+  const pwd = await hashPassword(password);
+  try {
+    const user = await prisma.user.create({ data: { email, password: pwd } });
+    const accessToken = signAccess({ sub: user.id });
+    const refreshToken = signRefresh({ sub: user.id });
+    await prisma.session.create({
+      data: { userId: user.id, token: hashRefresh(refreshToken), valid: true },
+    });
+    return { accessToken, refreshToken };
+  } catch (e: any) {
+    if (e?.code === "P2002" && e?.meta?.target?.includes("email")) {
+      throw new AppError("Email already in use", 409, { code: "EMAIL_TAKEN" });
+    }
+    throw e;
+  }
 }
 
 export async function refresh(oldRefresh: string): Promise<Tokens> {
