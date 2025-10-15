@@ -1,15 +1,21 @@
 import { Router } from "express";
-import { z } from "zod";
-import { login, refresh, logout } from "../services/authService.js";
-
-const LoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-});
-const RefreshSchema = z.object({ refreshToken: z.string().min(20) });
+import { LoginSchema, RegisterSchema, RefreshSchema } from "../dto/auth.js";
+import { login, refresh, logout, register } from "../services/authService.js";
 
 export const auth = Router();
 
+// Register
+auth.post("/register", async (req, res, next) => {
+  try {
+    const dto = RegisterSchema.parse(req.body);
+    const t = await register(dto);
+    res.json(t);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Login
 auth.post("/login", async (req, res, next) => {
   try {
     const dto = LoginSchema.parse(req.body);
@@ -19,6 +25,8 @@ auth.post("/login", async (req, res, next) => {
     next(e);
   }
 });
+
+// Token refresh
 auth.post("/refresh", async (req, res, next) => {
   try {
     const { refreshToken } = RefreshSchema.parse(req.body);
@@ -28,6 +36,8 @@ auth.post("/refresh", async (req, res, next) => {
     next(e);
   }
 });
+
+// Logout
 auth.post("/logout", async (req, res, next) => {
   try {
     const { refreshToken } = RefreshSchema.parse(req.body);
