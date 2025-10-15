@@ -7,6 +7,7 @@ import jwt, {
   type JwtPayload,
   type Secret,
 } from "jsonwebtoken";
+import crypto from "node:crypto";
 import { AppError } from "./errors.js";
 
 /** Public payload surface kept minimal & generic. */
@@ -82,7 +83,10 @@ export function verifyAccess<T extends object = JwtPayload>(token: string): T {
  * @returns JWT string
  */
 export function signRefresh(payload: JwtClaims): string {
-  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_EXP });
+  return jwt.sign(payload, REFRESH_SECRET, {
+    expiresIn: REFRESH_EXP,
+    jwtid: crypto.randomUUID(), // ensure a unique token each issuance
+  });
 }
 
 /**
