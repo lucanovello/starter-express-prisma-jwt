@@ -73,9 +73,9 @@ test("register → login → refresh rotates → old refresh rejected → logout
     .send({ refreshToken: refresh1 })
     .expect(401);
 
-  // API returns a typed error code; don't assert exact string to avoid flakiness,
-  // just ensure a machine code exists (e.g., REFRESH_REUSE / INVALID_REFRESH).
-  expect(typeof reuse.body?.code).toBe("string");
+  // API returns a typed error code under error.code; don't assert exact value
+  // to avoid flakiness, just ensure a machine code exists.
+  expect(typeof reuse.body?.error?.code).toBe("string");
 
   // 4) LOGOUT (with the latest refresh)
   await request(app)
