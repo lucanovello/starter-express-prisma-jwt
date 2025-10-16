@@ -1,52 +1,62 @@
+/**
+ * Global JSON error handler (must be registered last).
+ *
+ * Behavior:
+ * - ZodError → 400 "Invalid request payload" (+ issues in non-prod).
+ * - Invalid JSON (from express.json) → 400 "Invalid JSON".
+ * - AppError → status/message/code from the error.
+ * - Unknown → 500 "Internal Server Error".
+ */
+import { ZodError } from "zod";
 import type { ErrorRequestHandler } from "express";
 import type { ErrorResponse } from "../types/http.js";
 import { AppError } from "../lib/errors.js";
 
 const isProd = process.env.NODE_ENV === "production";
 
-/**
- * Global JSON error handler (must be registered last).
- *
- * Behavior:
- * - Maps invalid JSON body (SyntaxError from express.json()) → 400 "Invalid JSON".
- * - Formats AppError → uses its statusCode/message/code.
- * - Falls back to 500 "Internal Server Error" for unknown errors.
- * - Hides stacks/extra details in production (NODE_ENV=production).
- */
 export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
   if (res.headersSent) return next(err);
 
+  // 1) Validation errors from Zod → 400 with stable envelope
+  if (err instanceof ZodError) {
+    const body: ErrorResponse = {
+      error: { message: "Invalid request payload", code: "VALIDATION" },
+    };
+    if (!isProd) body.error.details = err.issues;
+    return res.status(400).json(body);
+  }
+
+  // 2) Malformed JSON body
   const isInvalidJson =
     err instanceof SyntaxError &&
     ((err as any).type === "entity.parse.failed" ||
       (err as any).status === 400);
 
-  const isAppError = err instanceof AppError;
-
-  let status = 500;
-  let message = "Internal Server Error";
-  let code: string | undefined;
-  // keep a hook for opt-in diagnostics (non-prod)
-  let details: unknown;
-
   if (isInvalidJson) {
-    status = 400;
-    message = "Invalid JSON";
-  } else if (isAppError) {
-    status = err.statusCode || 400;
-    message = err.message || "Bad Request";
-    code = err.code;
-  } else if (
-    typeof err?.status === "number" ||
-    typeof err?.statusCode === "number"
-  ) {
-    status = err.status ?? err.statusCode ?? status;
-    message = err.message || message;
+    const body: ErrorResponse = { error: { message: "Invalid JSON" } };
+    return res.status(400).json(body);
   }
 
-  const body: ErrorResponse = { error: { message } };
-  if (code) body.error.code = code;
-  if (!isProd && details !== undefined) body.error.details = details;
+  // 3) Domain errors
+  if (err instanceof AppError) {
+    const status = err.statusCode || 400;
+    const body: ErrorResponse = {
+      error: { message: err.message || "Bad Request" },
+    };
+    if (err.code) body.error.code = err.code;
+    return res.status(status).json(body);
+  }
 
-  res.status(status).json(body);
+  // 4) Generic HTTP-ish errors with status/statusCode
+  if (typeof err?.status === "number" || typeof err?.statusCode === "number") {
+    const status = (err.status ?? err.statusCode) as number;
+    const body: ErrorResponse = {
+      error: { message: err?.message || "Error" },
+    };
+    return res.status(status).json(body);
+  }
+
+  // 5) Fallback
+  const body: ErrorResponse = { error: { message: "Internal Server Error" } };
+  return res.status(500).json(body);
 };
