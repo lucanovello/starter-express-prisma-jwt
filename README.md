@@ -1,5 +1,6 @@
 # Starter: Express + Prisma + JWT
 
+[![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
 Minimal, batteries-included REST starter:
 
 - Auth: access/refresh JWT + rotation
