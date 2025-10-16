@@ -1,7 +1,3 @@
-/**
- * Health test. We set JWT env before importing the app because some modules
- * read env on import (e.g., jwt helpers). Dynamic import ensures order.
- */
 import { test, expect, beforeAll } from "vitest";
 import request from "supertest";
 
@@ -19,8 +15,9 @@ beforeAll(async () => {
   app = mod.default;
 });
 
-test("GET /health -> 200 with {status:'ok'}", async () => {
+test("GET /health -> 200 with {status:'ok'} and x-request-id", async () => {
   const res = await request(app).get("/health");
   expect(res.status).toBe(200);
   expect(res.body).toEqual({ status: "ok" });
+  expect(res.headers["x-request-id"]).toBeTruthy();
 });
