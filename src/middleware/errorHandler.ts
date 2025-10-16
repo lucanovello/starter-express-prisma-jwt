@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from "express";
+import type { ErrorRequestHandler } from "express";
 import type { ErrorResponse } from "../types/http.js";
 import { AppError } from "../lib/errors.js";
 
@@ -12,23 +12,8 @@ const isProd = process.env.NODE_ENV === "production";
  * - Formats AppError → uses its statusCode/message/code.
  * - Falls back to 500 "Internal Server Error" for unknown errors.
  * - Hides stacks/extra details in production (NODE_ENV=production).
- *
- * @param err Error thrown or passed to `next(err)`.
- * @param req Express request.
- * @param res Express response.
- * @param next Next middleware (used if headers already sent).
- * @returns Sends a consistent JSON error envelope: `{ error: { message, code? } }`.
- *
- * @example
- * // In a controller:
- * throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
  */
-export function errorHandler(
-  err: any,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
+export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
   if (res.headersSent) return next(err);
 
   const isInvalidJson =
@@ -41,6 +26,7 @@ export function errorHandler(
   let status = 500;
   let message = "Internal Server Error";
   let code: string | undefined;
+  // keep a hook for opt-in diagnostics (non-prod)
   let details: unknown;
 
   if (isInvalidJson) {
@@ -54,7 +40,7 @@ export function errorHandler(
     typeof err?.status === "number" ||
     typeof err?.statusCode === "number"
   ) {
-    status = err.status || err.statusCode;
+    status = err.status ?? err.statusCode ?? status;
     message = err.message || message;
   }
 
@@ -63,4 +49,4 @@ export function errorHandler(
   if (!isProd && details !== undefined) body.error.details = details;
 
   res.status(status).json(body);
-}
+};
