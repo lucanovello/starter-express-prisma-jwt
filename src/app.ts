@@ -17,6 +17,7 @@ import { registerSecurity } from "./middleware/security.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { auth as authRoutes } from "./routes/auth.js";
+import { prisma } from "./lib/prisma.js";
 
 const app = express();
 
@@ -62,15 +63,29 @@ const echoRequestId: RequestHandler = (
 };
 app.use(echoRequestId);
 
+// express.json() needs a cast for Express 5 + connect-style types.
 const jsonParser = express.json() as unknown as RequestHandler;
 app.use(jsonParser);
 
 // Security baseline (helmet, CORS, rate limit, etc.)
 registerSecurity(app);
 
-// Stable health oracle for tests/ops
+// Liveness: process is up and serving HTTP
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok" });
+});
+
+// Readiness: dependencies (DB) respond
+app.get("/ready", async (_req: Request, res: Response) => {
+  try {
+    // Cheap DB ping — succeeds if the DB is reachable
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({ status: "ready" });
+  } catch {
+    res
+      .status(503)
+      .json({ error: { message: "Not Ready", code: "NOT_READY" } });
+  }
 });
 
 // Feature routes
