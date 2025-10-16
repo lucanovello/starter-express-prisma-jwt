@@ -1,49 +1,51 @@
-# Starter: Express + TypeScript + Prisma (Postgres) + JWT
+# Starter: Express + Prisma + JWT
 
-A hiring-manager-friendly Node API starter with:
+Minimal, batteries-included REST starter:
 
-- **Express 5 (TypeScript)**
-- **Prisma** ORM targeting **Postgres**
-- **JWT auth**: access + rotating refresh (with reuse detection)
-- **Security**: helmet, CORS (open in dev), basic rate limiting
-- **Clean error handling** via `AppError`
-- **Tests**: Vitest + Supertest (integration)
-- **Docker Compose** for the DB (local dev)
-- **GitHub Actions CI**: Postgres service, Prisma generate/migrate, run tests, build
+- Auth: access/refresh JWT + rotation
+- Prisma/Postgres sessions
+- Pino logs with `x-request-id`
+- Liveness `/health` and readiness `/ready`
+- CI: Vitest + coverage artifact
 
-No frontend. Minimal surface area. Skimmable and runnable in minutes.
-
----
-
-## Quick Start (local dev)
-
-Prereqs: Node 20+, Docker, Docker Compose.
+## Quickstart (local dev)
 
 ```bash
-# 1) Clone and install
-git clone https://github.com/lucanovello/starter-express-prisma-jwt
-cd starter-express-prisma-jwt
-npm install
-
-# 2) Configure env
 cp .env.example .env
-# Edit .env with strong secrets (see ENV section below)
-
-# 3) Start Postgres (Docker)
 docker compose up -d db
-
-# 4) Prisma client & migrate schema
+npm i
 npx prisma generate
 npx prisma migrate deploy
-
-# 5) Run the API in dev (watch)
 npm run dev
 # GET http://localhost:3000/health -> {"status":"ok"}
 ```
 
-### Health endpoints
+## Test
 
-- `GET /health` → Liveness probe. Always returns `200 { "status": "ok" }`.
-- `GET /ready` → Readiness probe. Returns:
-  - `200 { "status": "ready" }` when the database responds,
-  - `503 { "error": { "message": "Not Ready", "code": "NOT_READY" } }` otherwise.
+```bash
+npm test
+npm run test:cov  # uploads lcov artifact in CI
+```
+
+## Health
+
+- `GET /health` → `200 {"status":"ok"}`
+- `GET /ready` → `200 {"status":"ready"}` when DB responds, else `503 {"error":{"message":"Not Ready","code":"NOT_READY"}}`
+
+## Env
+
+| Name               | Example      | Notes        |
+| ------------------ | ------------ | ------------ |
+| DATABASE_URL       | postgres://… | Postgres DSN |
+| JWT_ACCESS_SECRET  | dev-access   | required     |
+| JWT_REFRESH_SECRET | dev-refresh  | required     |
+| JWT_ACCESS_EXPIRY  | 15m          | default 15m  |
+| JWT_REFRESH_EXPIRY | 7d           | default 7d   |
+| PORT               | 3000         | optional     |
+
+## Run in Docker (prod-like)
+
+```bash
+docker build -t starter-api .
+docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SECRET=...   -e JWT_REFRESH_SECRET=...   starter-api
+```
