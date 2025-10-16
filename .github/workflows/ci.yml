@@ -38,8 +38,11 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install deps (work around npm optional-deps bug on Rollup)
+        run: |
+          rm -f package-lock.json
+          rm -rf node_modules
+          npm install --no-audit --no-fund
 
       - name: Prisma generate
         run: npx prisma generate
