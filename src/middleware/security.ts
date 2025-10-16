@@ -1,31 +1,31 @@
 /**
  * Registers baseline security middleware.
- * - Helmet for setting various HTTP headers.
- * - Rate limiting to prevent brute-force attacks.
- * - CORS to control cross-origin requests.
+ * - Helmet for HTTP headers
+ * - Rate limiting
+ * - CORS (open in dev; tighten in prod)
  */
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
 
 export function registerSecurity(app: Express): void {
-  // Set security-related HTTP headers
-  app.use(helmet());
+  // Cast once where libs still expose Connect-typed handlers.
+  app.use(helmet() as unknown as RequestHandler);
 
-  // Open CORS in dev; tighten origin list in production
   app.use(
     cors({
       origin: true,
       credentials: true,
-    })
+    }) as unknown as RequestHandler
   );
 
-  // Basic rate limiting: 100 req/15min/IP
-  app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: 100,
-    })
-  );
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 100, // 100 req per window per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+  }) as unknown as RequestHandler;
+
+  app.use(limiter);
 }
