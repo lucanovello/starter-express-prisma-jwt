@@ -40,3 +40,10 @@ npx prisma migrate deploy
 npm run dev
 # GET http://localhost:3000/health -> {"status":"ok"}
 ```
+
+### Health endpoints
+
+- `GET /health` → Liveness probe. Always returns `200 { "status": "ok" }`.
+- `GET /ready` → Readiness probe. Returns:
+  - `200 { "status": "ready" }` when the database responds,
+  - `503 { "error": { "message": "Not Ready", "code": "NOT_READY" } }` otherwise.
