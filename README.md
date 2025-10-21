@@ -55,3 +55,9 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 
 - Swagger UI: `GET /docs` (non-production)
 - Raw spec: `GET /openapi.json` (all environments)
+
+## Observability
+
+- Prometheus endpoint: `GET /metrics`
+  - Exposed in non-production by default.
+  - To enable in production: set `METRICS_ENABLED=true`.
