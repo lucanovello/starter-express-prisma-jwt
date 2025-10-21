@@ -12,6 +12,8 @@ import crypto from "node:crypto";
 import pino from "pino";
 import pinoHttp, { type Options } from "pino-http";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import swaggerUi from "swagger-ui-express";
+import openapi from "./docs/openapi.js";
 
 import { registerSecurity } from "./middleware/security.js";
 import { notFound } from "./middleware/notFound.js";
@@ -90,6 +92,15 @@ app.get("/ready", async (_req: Request, res: Response) => {
 
 // Feature routes
 app.use("/auth", authRoutes);
+
+// API docs
+// Serve OpenAPI spec as JSON
+app.get("/openapi.json", (_req, res) => res.json(openapi));
+
+// Serve Swagger UI only in non-production environments
+if (process.env.NODE_ENV !== "production") {
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapi));
+}
 
 // 404 + error pipeline
 app.use(notFound);
