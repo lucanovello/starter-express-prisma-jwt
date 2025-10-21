@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:cov": "vitest run --coverage"
+    "test:cov": "vitest run --coverage",
+    "openapi:gen": "node scripts/generate-openapi.mjs"
   },
   "repository": {
     "type": "git",
