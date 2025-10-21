@@ -14,6 +14,7 @@ import pinoHttp, { type Options } from "pino-http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import swaggerUi from "swagger-ui-express";
 import openapi from "./docs/openapi.js";
+import { metricsMiddleware, metricsHandler } from "./metrics/index.js";
 
 import { registerSecurity } from "./middleware/security.js";
 import { notFound } from "./middleware/notFound.js";
@@ -72,6 +73,14 @@ app.use(jsonParser);
 // Security baseline (helmet, CORS, rate limit, etc.)
 registerSecurity(app);
 
+// Metrics: request logging + /metrics endpoint
+app.use(metricsMiddleware);
+if (
+  process.env.NODE_ENV !== "production" ||
+  process.env.METRICS_ENABLED === "true"
+) {
+  app.get("/metrics", metricsHandler as RequestHandler);
+}
 // Liveness: process is up and serving HTTP
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok" });
