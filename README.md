@@ -61,3 +61,9 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 - Prometheus endpoint: `GET /metrics`
   - Exposed in non-production by default.
   - To enable in production: set `METRICS_ENABLED=true`.
+
+### CORS
+
+- Default (no `CORS_ORIGINS`): all origins allowed (good for local/dev).
+- Production: set `CORS_ORIGINS` to a comma-separated allowlist, e.g.  
+  `CORS_ORIGINS=https://app.example.com,https://admin.example.com`
