@@ -15,6 +15,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import swaggerUi from "swagger-ui-express";
 import openapi from "./docs/openapi.js";
 import { metricsMiddleware, metricsHandler } from "./metrics/index.js";
+import { isShuttingDown } from "./lifecycle/state.js";
 
 import { registerSecurity } from "./middleware/security.js";
 import { notFound } from "./middleware/notFound.js";
@@ -87,13 +88,20 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 // Readiness: dependencies (DB) respond
-app.get("/ready", async (_req: Request, res: Response) => {
+app.get("/ready", async (_req, res) => {
+  // When draining, advertise "not ready" so load balancers stop sending traffic.
+  if (isShuttingDown()) {
+    return res
+      .status(503)
+      .json({ error: { message: "Shutting down", code: "SHUTTING_DOWN" } });
+  }
+
   try {
-    // Cheap DB ping — succeeds if the DB is reachable
+    // Keep your existing DB health check here
     await prisma.$queryRaw`SELECT 1`;
-    res.status(200).json({ status: "ready" });
+    return res.json({ status: "ready" });
   } catch {
-    res
+    return res
       .status(503)
       .json({ error: { message: "Not Ready", code: "NOT_READY" } });
   }
