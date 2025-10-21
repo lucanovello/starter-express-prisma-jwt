@@ -50,3 +50,8 @@ npm run test:cov  # uploads lcov artifact in CI
 docker build -t starter-api .
 docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SECRET=...   -e JWT_REFRESH_SECRET=...   starter-api
 ```
+
+## API docs
+
+- Swagger UI: `GET /docs` (non-production)
+- Raw spec: `GET /openapi.json` (all environments)
