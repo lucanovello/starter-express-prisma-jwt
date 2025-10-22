@@ -57,7 +57,7 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 - Swagger UI: `GET /docs` (non-production)
 - Raw spec: `GET /openapi.json` (all environments)
 
-### CORS
+## CORS
 
 - Default (no `CORS_ORIGINS`): all origins allowed (good for local/dev).
 - Production: set `CORS_ORIGINS` to a comma-separated allowlist, e.g.  
