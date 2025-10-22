@@ -63,4 +63,5 @@ jobs:
           npx prisma generate
 
       # Run coverage tests (pretest:cov will stamp build/meta beforehand)
-      - run: npm run test:cov
+      - name: Run coverage tests
+        run: ROLLUP_SKIP_NODEJS_NATIVE=true npm run test:cov
