@@ -8,23 +8,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        # Wait until Postgres is healthy before running steps
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-
+    # 👇 Add here (job-level env)
     env:
       NODE_ENV: test
+      # Force Rollup portable build everywhere in this job
+      ROLLUP_SKIP_NODEJS_NATIVE: "1"
+
       # DB for Prisma
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/starter?schema=public
       # JWT secrets (dummy values for CI)
@@ -34,8 +23,20 @@ jobs:
       JWT_REFRESH_EXPIRY: 7d
       # Metrics off for tests
       METRICS_ENABLED: "false"
-      # Skip building Node.js native addons for Rollup (not needed for tests)
-      ROLLUP_SKIP_NODEJS_NATIVE: "true"
+
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +48,6 @@ jobs:
 
       - run: npm ci
 
-      # Create database the URL points to
       - name: Create test database
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-client
@@ -56,12 +56,13 @@ jobs:
         env:
           PGPASSWORD: postgres
 
-      # Ensure Prisma client/migrations are ready before tests
       - name: Prisma migrate & generate
         run: |
           npx prisma migrate deploy
           npx prisma generate
 
-      # Run coverage tests (pretest:cov will stamp build/meta beforehand)
+      # Also set the var at the step-level (extra safety for spawned workers)
       - name: Run coverage tests
-        run: ROLLUP_SKIP_NODEJS_NATIVE=true npm run test:cov
+        run: npm run test:cov
+        env:
+          ROLLUP_SKIP_NODEJS_NATIVE: "1"
