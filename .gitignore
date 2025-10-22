@@ -140,4 +140,4 @@ vite.config.ts.timestamp-*
 
 # Generated files
 /src/generated/
-/src/build/
+/src/build/meta.ts

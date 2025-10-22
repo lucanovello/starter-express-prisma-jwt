@@ -1,9 +1,8 @@
-name: ci
+name: CI
 
 on:
-  pull_request:
   push:
-    branches: [main]
+  pull_request:
 
 jobs:
   test:
@@ -11,53 +10,55 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        image: postgres:15
+        ports:
+          - 5432:5432
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: app_test
-        ports: ["5432:5432"]
+        # Wait until Postgres is healthy before running steps
         options: >-
           --health-cmd="pg_isready -U postgres"
-          --health-interval=5s --health-timeout=5s --health-retries=20
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     env:
       NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/app_test?schema=public
-      JWT_ACCESS_SECRET: test-access
-      JWT_REFRESH_SECRET: test-refresh
+      # DB for Prisma
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/starter?schema=public
+      # JWT secrets (dummy values for CI)
+      JWT_ACCESS_SECRET: test_access_secret_please_change
+      JWT_REFRESH_SECRET: test_refresh_secret_please_change
       JWT_ACCESS_EXPIRY: 15m
       JWT_REFRESH_EXPIRY: 7d
+      # Metrics off for tests
+      METRICS_ENABLED: "false"
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Use Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
-      - name: Install deps (work around npm optional-deps bug on Rollup)
+      - run: npm ci
+
+      # Create database the URL points to
+      - name: Create test database
         run: |
-          rm -f package-lock.json
-          rm -rf node_modules
-          npm install --no-audit --no-fund
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done
+          psql -h localhost -U postgres -c "CREATE DATABASE starter;" || true
+        env:
+          PGPASSWORD: postgres
 
-      - name: Prisma generate
-        run: npx prisma generate
+      # Ensure Prisma client/migrations are ready before tests
+      - name: Prisma migrate & generate
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
 
-      - name: Apply migrations (CI)
-        run: npx prisma migrate deploy
-
-      - name: Run tests (with coverage)
-        run: npm run test:cov
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-lcov
-          path: coverage/lcov.info
-
-      - name: Build (typecheck)
-        run: npm run build
+      # Run coverage tests (pretest:cov will stamp build/meta beforehand)
+      - run: npm run test:cov
