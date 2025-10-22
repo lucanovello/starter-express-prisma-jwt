@@ -1,6 +1,7 @@
 # Starter: Express + Prisma + JWT
 
 [![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
+
 Minimal, batteries-included REST starter:
 
 - Auth: access/refresh JWT + rotation
@@ -56,14 +57,17 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 - Swagger UI: `GET /docs` (non-production)
 - Raw spec: `GET /openapi.json` (all environments)
 
-## Observability
-
-- Prometheus endpoint: `GET /metrics`
-  - Exposed in non-production by default.
-  - To enable in production: set `METRICS_ENABLED=true`.
-
 ### CORS
 
 - Default (no `CORS_ORIGINS`): all origins allowed (good for local/dev).
 - Production: set `CORS_ORIGINS` to a comma-separated allowlist, e.g.  
   `CORS_ORIGINS=https://app.example.com,https://admin.example.com`
+
+## Observability
+
+- Prometheus: `GET /metrics` (non-production by default; enable in prod via `METRICS_ENABLED=true`)
+- Common series: `http_requests_total`, `http_request_duration_seconds`, Node process metrics.
+
+## Version
+
+- `GET /version` → `{ version, gitSha, buildTime }`

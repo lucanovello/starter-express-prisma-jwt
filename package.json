@@ -11,7 +11,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "openapi:gen": "node scripts/generate-openapi.mjs"
+    "openapi:gen": "node scripts/generate-openapi.mjs",
+    "predev": "node scripts/stamp-build-meta.mjs",
+    "prebuild": "node scripts/stamp-build-meta.mjs",
+    "setup:dev": "docker compose up -d db && npx prisma generate",
+    "dev:up": "npm run setup:dev && npm run dev"
   },
   "repository": {
     "type": "git",
