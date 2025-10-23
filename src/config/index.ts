@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-// Define the schema for environment variables
 const EnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -11,17 +10,13 @@ const EnvSchema = z.object({
   JWT_REFRESH_SECRET: z.string(),
   JWT_ACCESS_EXPIRY: z.string().default("15m"),
   JWT_REFRESH_EXPIRY: z.string().default("7d"),
-
-  // Optional settings
   CORS_ORIGINS: z.string().optional(),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
   RATE_LIMIT_RPM: z.coerce.number().default(600),
-  RATE_LIMIT_WINDOW_SEC: z.coerce.number().default(900), // 15 minutes
+  RATE_LIMIT_WINDOW_SEC: z.coerce.number().default(900),
   RATE_LIMIT_RPM_AUTH: z.coerce.number().default(120),
-
-  // Optional email / oauth later
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),
@@ -29,6 +24,12 @@ const EnvSchema = z.object({
   OAUTH_GOOGLE_CLIENT_ID: z.string().optional(),
   OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
 });
+
+export class ConfigError extends Error {
+  constructor(public readonly errors: Record<string, string[]>) {
+    super("Invalid configuration");
+  }
+}
 
 export type AppConfig = z.infer<typeof EnvSchema> & {
   corsOriginsParsed: string[];
@@ -40,16 +41,15 @@ export function getConfig(): AppConfig {
   if (cached) return cached;
   const parsed = EnvSchema.safeParse(process.env);
   if (!parsed.success) {
-    // eslint-disable-next-line no-console
-    console.error("Invalid configuration:", parsed.error.flatten().fieldErrors);
-    process.exit(1);
+    const errors = parsed.error.flatten().fieldErrors;
+    // library code throws; the process should exit only at the boundary
+    throw new ConfigError(errors);
   }
   const cfg = parsed.data;
   const corsOriginsParsed = (cfg.CORS_ORIGINS ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-
   cached = { ...cfg, corsOriginsParsed };
   return cached!;
 }
