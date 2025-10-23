@@ -5,8 +5,9 @@
  * - Exposes a handler to render metrics in Prometheus text format
  */
 
-import type { Request, Response, NextFunction } from "express";
 import * as client from "prom-client";
+
+import type { Request, Response, NextFunction } from "express";
 
 /** Collect default process metrics on a single (default) registry. */
 client.collectDefaultMetrics();

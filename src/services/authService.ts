@@ -1,8 +1,8 @@
-import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
 import { signAccess, signRefresh, verifyRefresh } from "../lib/jwt.js";
-import { hashToken } from "../lib/tokenHash.js";
 import { hashPassword, verifyPassword } from "../lib/password.js"; // Adjust names if your helpers differ
+import { prisma } from "../lib/prisma.js";
+import { hashToken } from "../lib/tokenHash.js";
 
 type RefreshClaims = { sub: string; sid: string };
 

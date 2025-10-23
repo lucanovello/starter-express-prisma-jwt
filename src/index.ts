@@ -2,9 +2,9 @@
  * Server entrypoint. Keep process boot isolated from tests.
  */
 import "dotenv/config";
-import { beginShutdown } from "./lifecycle/state.js";
-import { prisma } from "./lib/prisma.js";
 import { ConfigError } from "./config/index.js";
+import { prisma } from "./lib/prisma.js";
+import { beginShutdown } from "./lifecycle/state.js";
 
 const GRACEFUL_TIMEOUT_MS = 10_000;
 
@@ -22,8 +22,7 @@ async function main() {
     console.log(`[lifecycle] received ${sig}, beginning graceful shutdown`);
     beginShutdown();
 
-    server.close(async (err) => {
-      if (err) console.error("[lifecycle] server close error:", err);
+    const cleanup = async () => {
       try {
         await prisma.$disconnect();
       } catch (e) {
@@ -31,6 +30,11 @@ async function main() {
       } finally {
         process.exit(0);
       }
+    };
+
+    server.close((err) => {
+      if (err) console.error("[lifecycle] server close error:", err);
+      void cleanup();
     });
 
     setTimeout(() => {
