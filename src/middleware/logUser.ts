@@ -4,8 +4,9 @@
  * - userId is taken from payload.userId or payload.sub if present.
  */
 
-import type { Request, Response, NextFunction } from "express";
 import { verifyAccess } from "../lib/jwt.js";
+
+import type { Request, Response, NextFunction } from "express";
 
 export function attachUserToLog(
   req: Request,

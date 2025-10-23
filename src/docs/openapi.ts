@@ -8,12 +8,12 @@
  *   so existing app wiring (`/openapi.json`, `/docs`) doesn't change.
  */
 
-import { z } from "zod";
 import {
   OpenAPIRegistry,
   OpenApiGeneratorV31,
   extendZodWithOpenApi,
 } from "@asteasolutions/zod-to-openapi";
+import { z } from "zod";
 
 // Enable .openapi() on Zod schemas for registration and metadata
 extendZodWithOpenApi(z);

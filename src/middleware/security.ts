@@ -4,11 +4,13 @@
  * - Rate limiting
  * - CORS (open in dev; tighten in prod)
  */
-import type { Express, RequestHandler } from "express";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+
 import { getConfig } from "../config/index.js";
+
+import type { Express, RequestHandler } from "express";
 
 export function registerSecurity(app: Express): void {
   // Cast once where libs still expose Connect-typed handlers.

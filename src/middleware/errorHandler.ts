@@ -8,9 +8,11 @@
  * - Unknown → 500 "Internal Server Error".
  */
 import { ZodError } from "zod";
-import type { ErrorRequestHandler } from "express";
-import type { ErrorResponse } from "../types/http.js";
+
 import { AppError } from "../lib/errors.js";
+
+import type { ErrorResponse } from "../types/http.js";
+import type { ErrorRequestHandler } from "express";
 
 const isProd = process.env.NODE_ENV === "production";
 
