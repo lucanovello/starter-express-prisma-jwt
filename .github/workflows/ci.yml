@@ -7,21 +7,16 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    # 👇 Add here (job-level env)
     env:
       NODE_ENV: test
-      # Force Rollup portable build everywhere in this job
+      # Use "1" for cross-shell truthiness; keep consistent everywhere
       ROLLUP_SKIP_NODEJS_NATIVE: "1"
 
-      # DB for Prisma
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/starter?schema=public
-      # JWT secrets (dummy values for CI)
       JWT_ACCESS_SECRET: test_access_secret_please_change
       JWT_REFRESH_SECRET: test_refresh_secret_please_change
       JWT_ACCESS_EXPIRY: 15m
       JWT_REFRESH_EXPIRY: 7d
-      # Metrics off for tests
       METRICS_ENABLED: "false"
 
     services:
@@ -32,6 +27,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: starter # 👈 let the container create the DB
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=10s
@@ -48,25 +44,11 @@ jobs:
 
       - run: npm ci
 
-      - name: Create test database
-        run: |
-          sudo apt-get update && sudo apt-get install -y postgresql-client
-          until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done
-          psql -h localhost -U postgres -c "CREATE DATABASE starter;" || true
-        env:
-          PGPASSWORD: postgres
-
       - name: Prisma migrate & generate
         run: |
           npx prisma migrate deploy
           npx prisma generate
 
-      - run: |
-          node -e "console.log('ROLLUP_SKIP_NODEJS_NATIVE=', process.env.ROLLUP_SKIP_NODEJS_NATIVE)"
-          node -e "try{console.log('rollup version', require('rollup/package.json').version)}catch(e){console.log('rollup not installed')}"
-
-      # Also set the var at the step-level (extra safety for spawned workers)
       - name: Run coverage tests
         run: npm run test:cov
-        env:
-          ROLLUP_SKIP_NODEJS_NATIVE: "true"
+        # (remove the step-level ROLLUP var override that was "true")
