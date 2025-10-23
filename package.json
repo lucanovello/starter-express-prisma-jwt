@@ -17,18 +17,6 @@
     "setup:dev": "docker compose up -d db && npx prisma generate",
     "dev:up": "npm run setup:dev && npm run dev"
   },
-  "vitest": {
-    "setupFiles": [
-      "./vitest.setup.ts"
-    ],
-    "poolOptions": {
-      "threads": {
-        "env": {
-          "ROLLUP_SKIP_NODEJS_NATIVE": "1"
-        }
-      }
-    }
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lucanovello/starter-express-prisma-jwt.git"
