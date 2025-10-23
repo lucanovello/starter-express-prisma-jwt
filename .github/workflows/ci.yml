@@ -69,4 +69,4 @@ jobs:
       - name: Run coverage tests
         run: npm run test:cov
         env:
-          ROLLUP_SKIP_NODEJS_NATIVE: "1"
+          ROLLUP_SKIP_NODEJS_NATIVE: "true"
