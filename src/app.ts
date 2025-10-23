@@ -20,8 +20,10 @@ import { isShuttingDown } from "./lifecycle/state.js";
 import { registerSecurity } from "./middleware/security.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { attachUserToLog } from "./middleware/logUser.js";
 import { auth as authRoutes } from "./routes/auth.js";
 import { prisma } from "./lib/prisma.js";
+import { BUILD_VERSION, BUILD_GIT_SHA, BUILD_TIME } from "./build/meta.js";
 
 const app = express();
 
@@ -82,6 +84,10 @@ if (
 ) {
   app.get("/metrics", metricsHandler as RequestHandler);
 }
+
+// Attach userId to logs when a valid token is present
+app.use(attachUserToLog as RequestHandler);
+
 // Liveness: process is up and serving HTTP
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok" });
@@ -105,6 +111,15 @@ app.get("/ready", async (_req, res) => {
       .status(503)
       .json({ error: { message: "Not Ready", code: "NOT_READY" } });
   }
+});
+
+// Build metadata
+app.get("/version", (_req: Request, res: Response) => {
+  res.json({
+    version: BUILD_VERSION,
+    gitSha: BUILD_GIT_SHA,
+    buildTime: BUILD_TIME,
+  });
 });
 
 // Feature routes

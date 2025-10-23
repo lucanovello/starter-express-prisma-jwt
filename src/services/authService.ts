@@ -1,126 +1,147 @@
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
-import { hashPassword, verifyPassword } from "../lib/password.js";
 import { signAccess, signRefresh, verifyRefresh } from "../lib/jwt.js";
-import { hashRefresh } from "../lib/tokenHash.js";
+import { hashToken } from "../lib/tokenHash.js";
+import { hashPassword, verifyPassword } from "../lib/password.js"; // Adjust names if your helpers differ
 
-export type LoginDTO = { email: string; password: string };
-export type RegisterDTO = { email: string; password: string };
-export type Tokens = { accessToken: string; refreshToken: string };
+type RefreshClaims = { sub: string; sid: string };
 
-/**
- * Login with email/password.
- * WHY: Hash-safe credential check, then issue access+refresh and persist session.
- */
-export async function login({ email, password }: LoginDTO): Promise<Tokens> {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    throw new AppError("Invalid credentials", 401, { code: "BAD_CREDENTIALS" });
+// -------- Register --------
+export async function register(input: { email: string; password: string }) {
+  const { email, password } = input;
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    throw new AppError("Email already registered", 409, {
+      code: "EMAIL_TAKEN",
+    });
   }
 
-  const ok = await verifyPassword(user.password, password);
-  if (!ok) {
-    throw new AppError("Invalid credentials", 401, { code: "BAD_CREDENTIALS" });
-  }
+  const passwordHash = await hashPassword(password);
 
-  const accessToken = signAccess({ sub: user.id });
-  const refreshToken = signRefresh({ sub: user.id }); // payload object (matches jwt.ts)
+  // Create user and session, then wire up the refresh token hash
+  const { user, session } = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: { email, password: passwordHash },
+    });
 
-  await prisma.session.create({
-    data: { userId: user.id, token: hashRefresh(refreshToken), valid: true },
+    const session = await tx.session.create({
+      data: { userId: user.id, valid: true, token: "" }, // placeholder, update next
+    });
+
+    // Now that we have a session id, mint tokens
+    const accessToken = signAccess({ sub: user.id, sessionId: session.id });
+    const refreshToken = signRefresh({ sub: user.id, sid: session.id });
+
+    // Store hash of refresh token on the session
+    const tokenHash = await hashToken(refreshToken);
+    await tx.session.update({
+      where: { id: session.id },
+      data: { token: tokenHash },
+    });
+
+    return { user, session: { ...session }, accessToken, refreshToken };
+  });
+
+  // Recreate tokens after tx to return (from values above)
+  const accessToken = signAccess({ sub: user.id, sessionId: session.id });
+  const refreshToken = signRefresh({ sub: user.id, sid: session.id });
+
+  // Persist the (new) refresh hash again to ensure match (safe even if equal)
+  await prisma.session.update({
+    where: { id: session.id },
+    data: { token: await hashToken(refreshToken) },
   });
 
   return { accessToken, refreshToken };
 }
 
-/**
- * Register a new user and issue tokens.
- */
-export async function register({
-  email,
-  password,
-}: RegisterDTO): Promise<Tokens> {
-  const pwd = await hashPassword(password);
-  try {
-    const user = await prisma.user.create({ data: { email, password: pwd } });
+// -------- Login --------
+export async function login(input: { email: string; password: string }) {
+  const { email, password } = input;
 
-    const accessToken = signAccess({ sub: user.id });
-    const refreshToken = signRefresh({ sub: user.id });
-
-    await prisma.session.create({
-      data: { userId: user.id, token: hashRefresh(refreshToken), valid: true },
-    });
-
-    return { accessToken, refreshToken };
-  } catch (e: any) {
-    // Unique email constraint (Prisma P2002).
-    if (e?.code === "P2002" && e?.meta?.target?.includes("email")) {
-      throw new AppError("Email already in use", 409, { code: "EMAIL_TAKEN" });
-    }
-    throw e;
-  }
-}
-
-/**
- * Rotate a refresh token; detect reuse and revoke all sessions if detected.
- */
-export async function refresh(oldRefresh: string): Promise<Tokens> {
-  // Verify signature/expiry first to avoid leaking info.
-  let claims: { sub: string };
-  try {
-    claims = verifyRefresh<{ sub: string }>(oldRefresh);
-  } catch {
-    throw new AppError("Invalid refresh token", 401, {
-      code: "REFRESH_INVALID",
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    throw new AppError("Invalid credentials", 401, {
+      code: "INVALID_CREDENTIALS",
     });
   }
 
-  const hashed = hashRefresh(oldRefresh);
-  const session = await prisma.session.findFirst({
-    where: { token: hashed, valid: true },
-    select: { id: true, userId: true },
+  const ok = await verifyPassword(user.password, password);
+  if (!ok) {
+    throw new AppError("Invalid credentials", 401, {
+      code: "INVALID_CREDENTIALS",
+    });
+  }
+
+  const session = await prisma.session.create({
+    data: { userId: user.id, valid: true, token: "" },
   });
 
-  // Reuse or stale token: revoke all active sessions for the user.
-  if (!session) {
-    if (claims?.sub) {
-      await prisma.session.updateMany({
-        where: { userId: claims.sub, valid: true }, // scalar equals (correct)
-        data: { valid: false },
-      });
-    }
-    throw new AppError("Refresh token reuse detected", 401, {
-      code: "REFRESH_REUSE",
-    });
-  }
+  const accessToken = signAccess({ sub: user.id, sessionId: session.id });
+  const refreshToken = signRefresh({ sub: user.id, sid: session.id });
 
-  // Rotate: invalidate the used session, issue new tokens, persist new session.
   await prisma.session.update({
     where: { id: session.id },
-    data: { valid: false },
+    data: { token: await hashToken(refreshToken) },
   });
 
-  const accessToken = signAccess({ sub: session.userId });
-  const newRefresh = signRefresh({ sub: session.userId });
+  return { accessToken, refreshToken };
+}
 
-  await prisma.session.create({
-    data: {
-      userId: session.userId,
-      token: hashRefresh(newRefresh),
-      valid: true,
-    },
+// -------- Refresh (rotate) --------
+export async function refresh(incomingRefresh: string) {
+  if (!incomingRefresh) {
+    throw new AppError("Refresh token required", 400, {
+      code: "REFRESH_REQUIRED",
+    });
+  }
+
+  const payload = verifyRefresh<RefreshClaims>(incomingRefresh);
+  const { sub: userId, sid: sessionId } = payload;
+
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    include: { user: true },
+  });
+
+  if (!session || !session.valid) {
+    throw new AppError("Invalid session", 401, { code: "SESSION_INVALID" });
+  }
+
+  // Reuse detection – must match stored hash
+  const incomingHash = await hashToken(incomingRefresh);
+  if (session.token !== incomingHash) {
+    // Optionally revoke all user sessions here.
+    throw new AppError("Invalid token", 401, { code: "REFRESH_REUSE" });
+  }
+
+  // Mint a new pair (signRefresh adds unique jti so string differs)
+  const accessToken = signAccess({ sub: userId, sessionId });
+  const newRefresh = signRefresh({ sub: userId, sid: sessionId });
+
+  await prisma.session.update({
+    where: { id: sessionId },
+    data: { token: await hashToken(newRefresh) },
   });
 
   return { accessToken, refreshToken: newRefresh };
 }
 
-/**
- * Logout: invalidate the provided refresh token if it exists and is valid.
- */
-export async function logout(refreshToken: string): Promise<void> {
-  const hashed = hashRefresh(refreshToken);
-  await prisma.session.updateMany({
-    where: { token: hashed, valid: true },
-    data: { valid: false },
-  });
+// -------- Logout --------
+export async function logout(incomingRefresh: string) {
+  if (!incomingRefresh) return;
+
+  try {
+    const payload = verifyRefresh<RefreshClaims>(incomingRefresh);
+    const { sid } = payload;
+
+    // Invalidate the session and clear the stored hash
+    await prisma.session.update({
+      where: { id: sid },
+      data: { valid: false, token: "" },
+    });
+  } catch {
+    // ignore bogus tokens; logout is idempotent
+  }
 }

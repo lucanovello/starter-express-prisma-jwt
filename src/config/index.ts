@@ -18,6 +18,8 @@ const EnvSchema = z.object({
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
   RATE_LIMIT_RPM: z.coerce.number().default(600),
+  RATE_LIMIT_WINDOW_SEC: z.coerce.number().default(900), // 15 minutes
+  RATE_LIMIT_RPM_AUTH: z.coerce.number().default(120),
 
   // Optional email / oauth later
   SMTP_HOST: z.string().optional(),

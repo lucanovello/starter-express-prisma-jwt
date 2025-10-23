@@ -4,13 +4,14 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
       exclude: [
-        "dist/**", // built js
-        "prisma/**", // schema/migrations
-        "src/generated/**", // future-proof: ignore generated code
+        "dist/**",
+        "prisma/**",
+        "src/generated/**",
         "src/types/**",
         "vitest.config.ts",
       ],
