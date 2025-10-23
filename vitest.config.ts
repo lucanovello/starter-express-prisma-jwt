@@ -4,8 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
-    // Runs in every worker – sets the env var before tests execute
-    setupFiles: ["./vitest.setup.ts", "tests/setup-env.ts"],
+    setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],

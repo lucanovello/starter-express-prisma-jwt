@@ -61,6 +61,10 @@ jobs:
           npx prisma migrate deploy
           npx prisma generate
 
+      - run: |
+          node -e "console.log('ROLLUP_SKIP_NODEJS_NATIVE=', process.env.ROLLUP_SKIP_NODEJS_NATIVE)"
+          node -e "try{console.log('rollup version', require('rollup/package.json').version)}catch(e){console.log('rollup not installed')}"
+
       # Also set the var at the step-level (extra safety for spawned workers)
       - name: Run coverage tests
         run: npm run test:cov
