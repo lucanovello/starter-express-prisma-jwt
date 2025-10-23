@@ -19,6 +19,7 @@
     "dev:up": "npm run setup:dev && npm run dev",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
+    "pretest:ci": "node scripts/stamp-build-meta.mjs",
     "test:ci": "dotenv -e .env.test -- vitest run --coverage",
     "check": "npm run typecheck && npm run lint && npm run test:ci"
   },
