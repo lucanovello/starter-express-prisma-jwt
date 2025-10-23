@@ -3,14 +3,15 @@
  * Reads secrets/expiries from the central config module to ensure
  * consistent, validated configuration across the application.
  */
-import { randomUUID } from "node:crypto";
 import jwt, {
   type JwtPayload,
   type Secret,
   type SignOptions,
 } from "jsonwebtoken";
-import { AppError } from "../lib/errors.js";
+import { randomUUID } from "node:crypto";
+
 import { getConfig } from "../config/index.js";
+import { AppError } from "../lib/errors.js";
 
 const cfg = getConfig();
 

@@ -11,19 +11,20 @@ import express, {
 import crypto from "node:crypto";
 import pino from "pino";
 import pinoHttp, { type Options } from "pino-http";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import swaggerUi from "swagger-ui-express";
-import openapi from "./docs/openapi.js";
-import { metricsMiddleware, metricsHandler } from "./metrics/index.js";
-import { isShuttingDown } from "./lifecycle/state.js";
 
-import { registerSecurity } from "./middleware/security.js";
-import { notFound } from "./middleware/notFound.js";
+import { BUILD_VERSION, BUILD_GIT_SHA, BUILD_TIME } from "./build/meta.js";
+import openapi from "./docs/openapi.js";
+import { prisma } from "./lib/prisma.js";
+import { isShuttingDown } from "./lifecycle/state.js";
+import { metricsMiddleware, metricsHandler } from "./metrics/index.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { attachUserToLog } from "./middleware/logUser.js";
+import { notFound } from "./middleware/notFound.js";
+import { registerSecurity } from "./middleware/security.js";
 import { auth as authRoutes } from "./routes/auth.js";
-import { prisma } from "./lib/prisma.js";
-import { BUILD_VERSION, BUILD_GIT_SHA, BUILD_TIME } from "./build/meta.js";
+
+import type { IncomingMessage, ServerResponse } from "node:http";
 
 const app = express();
 

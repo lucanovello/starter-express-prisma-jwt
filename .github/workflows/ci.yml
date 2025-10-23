@@ -27,7 +27,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: starter # 👈 let the container create the DB
+          POSTGRES_DB: starter #  let the container create the DB
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=10s
@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.19.0
           cache: npm
 
       - run: npm ci
@@ -49,6 +49,7 @@ jobs:
           npx prisma migrate deploy
           npx prisma generate
 
-      - name: Run coverage tests
-        run: npm run test:cov
-        # (remove the step-level ROLLUP var override that was "true")
+      - name: Static checks (types + lint)
+        run: npm run typecheck && npm run lint
+      - name: Tests (coverage + thresholds)
+        run: npm run test:ci
