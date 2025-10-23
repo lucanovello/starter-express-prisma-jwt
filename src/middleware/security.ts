@@ -16,6 +16,9 @@ export function registerSecurity(app: Express): void {
 
   const cfg = getConfig();
   const allowlist = cfg.corsOriginsParsed;
+  const windowMs = cfg.RATE_LIMIT_WINDOW_SEC * 1000;
+  const toMax = (rpm: number) =>
+    Math.max(1, Math.ceil(rpm * (cfg.RATE_LIMIT_WINDOW_SEC / 60)));
 
   app.use(
     cors({
@@ -36,12 +39,24 @@ export function registerSecurity(app: Express): void {
     }) as RequestHandler
   );
 
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    limit: 100, // 100 req per window per IP
-    standardHeaders: true,
-    legacyHeaders: false,
-  }) as unknown as RequestHandler;
+  // Global limiter
+  app.use(
+    rateLimit({
+      windowMs,
+      max: toMax(cfg.RATE_LIMIT_RPM),
+      standardHeaders: true,
+      legacyHeaders: false,
+    }) as RequestHandler
+  );
 
-  app.use(limiter);
+  // Stricter limiter for auth endpoints
+  app.use(
+    "/auth",
+    rateLimit({
+      windowMs,
+      max: toMax(cfg.RATE_LIMIT_RPM_AUTH),
+      standardHeaders: true,
+      legacyHeaders: false,
+    }) as RequestHandler
+  );
 }

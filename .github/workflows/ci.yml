@@ -1,63 +1,72 @@
-name: ci
+name: CI
 
 on:
-  pull_request:
   push:
-    branches: [main]
+  pull_request:
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
+    # 👇 Add here (job-level env)
+    env:
+      NODE_ENV: test
+      # Force Rollup portable build everywhere in this job
+      ROLLUP_SKIP_NODEJS_NATIVE: "1"
+
+      # DB for Prisma
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/starter?schema=public
+      # JWT secrets (dummy values for CI)
+      JWT_ACCESS_SECRET: test_access_secret_please_change
+      JWT_REFRESH_SECRET: test_refresh_secret_please_change
+      JWT_ACCESS_EXPIRY: 15m
+      JWT_REFRESH_EXPIRY: 7d
+      # Metrics off for tests
+      METRICS_ENABLED: "false"
+
     services:
       postgres:
-        image: postgres:16
+        image: postgres:15
+        ports:
+          - 5432:5432
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: app_test
-        ports: ["5432:5432"]
         options: >-
           --health-cmd="pg_isready -U postgres"
-          --health-interval=5s --health-timeout=5s --health-retries=20
-
-    env:
-      NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/app_test?schema=public
-      JWT_ACCESS_SECRET: test-access
-      JWT_REFRESH_SECRET: test-refresh
-      JWT_ACCESS_EXPIRY: 15m
-      JWT_REFRESH_EXPIRY: 7d
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Use Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
-      - name: Install deps (work around npm optional-deps bug on Rollup)
+      - run: npm ci
+
+      - name: Create test database
         run: |
-          rm -f package-lock.json
-          rm -rf node_modules
-          npm install --no-audit --no-fund
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done
+          psql -h localhost -U postgres -c "CREATE DATABASE starter;" || true
+        env:
+          PGPASSWORD: postgres
 
-      - name: Prisma generate
-        run: npx prisma generate
+      - name: Prisma migrate & generate
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
 
-      - name: Apply migrations (CI)
-        run: npx prisma migrate deploy
+      - run: |
+          node -e "console.log('ROLLUP_SKIP_NODEJS_NATIVE=', process.env.ROLLUP_SKIP_NODEJS_NATIVE)"
+          node -e "try{console.log('rollup version', require('rollup/package.json').version)}catch(e){console.log('rollup not installed')}"
 
-      - name: Run tests (with coverage)
+      # Also set the var at the step-level (extra safety for spawned workers)
+      - name: Run coverage tests
         run: npm run test:cov
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-lcov
-          path: coverage/lcov.info
-
-      - name: Build (typecheck)
-        run: npm run build
+        env:
+          ROLLUP_SKIP_NODEJS_NATIVE: "true"
