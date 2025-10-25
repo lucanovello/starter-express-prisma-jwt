@@ -1,8 +1,8 @@
 import { AppError } from "../lib/errors.js";
 import { signAccess, signRefresh, verifyRefresh } from "../lib/jwt.js";
-import { hashPassword, verifyPassword } from "../lib/password.js"; // Adjust names if your helpers differ
+import { hashPassword, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
-import { hashToken } from "../lib/tokenHash.js";
+import { hashToken, tokenEqualsHash } from "../lib/tokenHash.js";
 
 type RefreshClaims = { sub: string; sid: string };
 
@@ -18,11 +18,11 @@ export async function register(input: { email: string; password: string }) {
   }
 
   const passwordHash = await hashPassword(password);
+  const emailLc = email.toLowerCase();
 
-  // Create user and session, then wire up the refresh token hash
-  const { user, session } = await prisma.$transaction(async (tx) => {
+  const { accessToken, refreshToken } = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
-      data: { email, password: passwordHash },
+      data: { email: emailLc, password: passwordHash },
     });
 
     const session = await tx.session.create({
@@ -40,17 +40,7 @@ export async function register(input: { email: string; password: string }) {
       data: { token: tokenHash },
     });
 
-    return { user, session: { ...session }, accessToken, refreshToken };
-  });
-
-  // Recreate tokens after tx to return (from values above)
-  const accessToken = signAccess({ sub: user.id, sessionId: session.id });
-  const refreshToken = signRefresh({ sub: user.id, sid: session.id });
-
-  // Persist the (new) refresh hash again to ensure match (safe even if equal)
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { token: await hashToken(refreshToken) },
+    return { accessToken, refreshToken };
   });
 
   return { accessToken, refreshToken };
@@ -59,8 +49,10 @@ export async function register(input: { email: string; password: string }) {
 // -------- Login --------
 export async function login(input: { email: string; password: string }) {
   const { email, password } = input;
-
-  const user = await prisma.user.findUnique({ where: { email } });
+  // Find the user case-insensitively by email
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
   if (!user) {
     throw new AppError("Invalid credentials", 401, {
       code: "INVALID_CREDENTIALS",
@@ -110,9 +102,12 @@ export async function refresh(incomingRefresh: string) {
   }
 
   // Reuse detection – must match stored hash
-  const incomingHash = await hashToken(incomingRefresh);
-  if (session.token !== incomingHash) {
-    // Optionally revoke all user sessions here.
+  if (!tokenEqualsHash(incomingRefresh, session.token)) {
+    // Revoke all user sessions on token reuse (possible theft)
+    await prisma.session.updateMany({
+      where: { userId: session.userId },
+      data: { valid: false, token: "" },
+    });
     throw new AppError("Invalid token", 401, { code: "REFRESH_REUSE" });
   }
 
