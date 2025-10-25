@@ -19,6 +19,7 @@ npm i
 npx prisma generate
 npx prisma migrate deploy
 npm run dev
+# (Ensure you're using Node 20.x)
 # GET http://localhost:3000/health -> {"status":"ok"}
 ```
 
