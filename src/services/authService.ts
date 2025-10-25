@@ -10,40 +10,50 @@ type RefreshClaims = { sub: string; sid: string };
 export async function register(input: { email: string; password: string }) {
   const { email, password } = input;
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const emailLc = email.toLowerCase();
+
+  const existing = await prisma.user.findUnique({ where: { email: emailLc } });
   if (existing) {
-    throw new AppError("Email already registered", 409, {
-      code: "EMAIL_TAKEN",
-    });
+    throw new AppError("Email already registered", 409, { code: "EMAIL_TAKEN" });
   }
 
   const passwordHash = await hashPassword(password);
-  const emailLc = email.toLowerCase();
 
-  const { accessToken, refreshToken } = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: { email: emailLc, password: passwordHash },
+  try {
+    const { accessToken, refreshToken } = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { email: emailLc, password: passwordHash },
+      });
+
+      const session = await tx.session.create({
+        data: { userId: user.id, valid: true, token: "" }, // placeholder, update next
+      });
+
+      // Now that we have a session id, mint tokens
+      const accessToken = signAccess({ sub: user.id, sessionId: session.id });
+      const refreshToken = signRefresh({ sub: user.id, sid: session.id });
+
+      // Store hash of refresh token on the session
+      const tokenHash = await hashToken(refreshToken);
+      await tx.session.update({
+        where: { id: session.id },
+        data: { token: tokenHash },
+      });
+
+      return { accessToken, refreshToken };
     });
-
-    const session = await tx.session.create({
-      data: { userId: user.id, valid: true, token: "" }, // placeholder, update next
-    });
-
-    // Now that we have a session id, mint tokens
-    const accessToken = signAccess({ sub: user.id, sessionId: session.id });
-    const refreshToken = signRefresh({ sub: user.id, sid: session.id });
-
-    // Store hash of refresh token on the session
-    const tokenHash = await hashToken(refreshToken);
-    await tx.session.update({
-      where: { id: session.id },
-      data: { token: tokenHash },
-    });
-
     return { accessToken, refreshToken };
-  });
-
-  return { accessToken, refreshToken };
+  } catch (err: any) {
+    if (err?.code === "P2002") {
+      const t = Array.isArray(err.meta?.target)
+        ? err.meta.target.join(",")
+        : (err.meta?.target ?? "");
+      if (String(t).includes("email")) {
+        throw new AppError("Email already registered", 409, { code: "EMAIL_TAKEN" });
+      }
+    }
+    throw err;
+  }
 }
 
 // -------- Login --------
