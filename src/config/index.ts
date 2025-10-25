@@ -1,9 +1,7 @@
 import { z } from "zod";
 
 const EnvSchema = z.object({
-  NODE_ENV: z
-    .enum(["development", "test", "production"])
-    .default("development"),
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string(),
   JWT_ACCESS_SECRET: z.string(),
@@ -11,9 +9,7 @@ const EnvSchema = z.object({
   JWT_ACCESS_EXPIRY: z.string().default("15m"),
   JWT_REFRESH_EXPIRY: z.string().default("7d"),
   CORS_ORIGINS: z.string().optional(),
-  LOG_LEVEL: z
-    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
-    .default("info"),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   RATE_LIMIT_RPM: z.coerce.number().default(600),
   RATE_LIMIT_WINDOW_SEC: z.coerce.number().default(900),
   RATE_LIMIT_RPM_AUTH: z.coerce.number().default(120),
@@ -23,6 +19,7 @@ const EnvSchema = z.object({
   SMTP_PASS: z.string().optional(),
   OAUTH_GOOGLE_CLIENT_ID: z.string().optional(),
   OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
+  METRICS_ENABLED: z.string().optional(),
 });
 
 export class ConfigError extends Error {
