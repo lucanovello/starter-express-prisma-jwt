@@ -14,6 +14,7 @@ import pinoHttp, { type Options } from "pino-http";
 import swaggerUi from "swagger-ui-express";
 
 import { BUILD_VERSION, BUILD_GIT_SHA, BUILD_TIME } from "./build/meta.js";
+import { getConfig } from "./config/index.js";
 import openapi from "./docs/openapi.js";
 import { prisma } from "./lib/prisma.js";
 import { isShuttingDown } from "./lifecycle/state.js";
@@ -29,19 +30,16 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 const app = express();
 
 // Structured logging with request correlation.
+const cfg = getConfig();
 const logger = pino(
-  process.env.NODE_ENV === "production"
-    ? {}
-    : { transport: { target: "pino-pretty" } }
+  cfg.NODE_ENV === "production"
+    ? { level: cfg.LOG_LEVEL }
+    : { level: cfg.LOG_LEVEL, transport: { target: "pino-pretty" } },
 );
 
-// pino-http is typed at the Node http layer.
-// Keep these hooks on IncomingMessage/ServerResponse,
-// and bridge to Express types only where needed.
 const pinoOptions: Options<IncomingMessage, ServerResponse<IncomingMessage>> = {
   logger,
-  genReqId: (req) =>
-    (req.headers["x-request-id"] as string) || crypto.randomUUID(),
+  genReqId: (req) => (req.headers["x-request-id"] as string) || crypto.randomUUID(),
   customProps: (_req, res) => {
     // Express adds res.locals; not present on ServerResponse types.
     const anyRes = res as unknown as { locals?: Record<string, unknown> };
@@ -51,18 +49,12 @@ const pinoOptions: Options<IncomingMessage, ServerResponse<IncomingMessage>> = {
 
 // Some installs surface pinoHttp’s type as a module object.
 // Cast once to a callable Express RequestHandler factory.
-const pinoHttpFn = pinoHttp as unknown as (
-  opts: typeof pinoOptions
-) => RequestHandler;
+const pinoHttpFn = pinoHttp as unknown as (opts: typeof pinoOptions) => RequestHandler;
 
 app.use(pinoHttpFn(pinoOptions));
 
 // Echo the id to clients so they can reference it in bug reports, etc.
-const echoRequestId: RequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+const echoRequestId: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
   // pino-http attaches `req.id` as string | number
   const id = (req as unknown as { id?: string | number }).id;
   if (id != null) res.setHeader("x-request-id", String(id));
@@ -79,10 +71,7 @@ registerSecurity(app);
 
 // Metrics: request logging + /metrics endpoint
 app.use(metricsMiddleware);
-if (
-  process.env.NODE_ENV !== "production" ||
-  process.env.METRICS_ENABLED === "true"
-) {
+if (cfg.NODE_ENV !== "production" || cfg.METRICS_ENABLED === "true") {
   app.get("/metrics", metricsHandler as RequestHandler);
 }
 
@@ -98,9 +87,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.get("/ready", async (_req, res) => {
   // When draining, advertise "not ready" so load balancers stop sending traffic.
   if (isShuttingDown()) {
-    return res
-      .status(503)
-      .json({ error: { message: "Shutting down", code: "SHUTTING_DOWN" } });
+    return res.status(503).json({ error: { message: "Shutting down", code: "SHUTTING_DOWN" } });
   }
 
   try {
@@ -108,9 +95,7 @@ app.get("/ready", async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;
     return res.json({ status: "ready" });
   } catch {
-    return res
-      .status(503)
-      .json({ error: { message: "Not Ready", code: "NOT_READY" } });
+    return res.status(503).json({ error: { message: "Not Ready", code: "NOT_READY" } });
   }
 });
 
