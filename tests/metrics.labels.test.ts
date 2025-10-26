@@ -9,6 +9,8 @@ beforeAll(async () => {
   process.env.JWT_REFRESH_SECRET ??= "test-refresh";
   process.env.JWT_ACCESS_EXPIRY ??= "15m";
   process.env.JWT_REFRESH_EXPIRY ??= "7d";
+  process.env.METRICS_GUARD = "secret";
+  process.env.METRICS_GUARD_SECRET = "labels-secret";
 
   const mod = await import("../src/app.js");
   app = mod.default;
@@ -21,7 +23,10 @@ beforeEach(() => {
 test("metrics label includes router base path", async () => {
   await request(app).post("/auth/login").send({ email: "demo@example.com" }).expect(400);
 
-  const metrics = await request(app).get("/metrics").expect(200);
+  const metrics = await request(app)
+    .get("/metrics")
+    .set("x-metrics-secret", "labels-secret")
+    .expect(200);
   expect(metrics.text).toContain('route="/auth/login"');
   expect(metrics.text).not.toContain('route="/login"');
 });
