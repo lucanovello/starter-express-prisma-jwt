@@ -13,14 +13,18 @@ async function main() {
 
   // Lazy-load app so config validation errors thrown during module init are catchable here.
   const { default: app } = await import("./app.js");
+  const { scheduleSessionCleanup } = await import("./jobs/sessionCleanup.js");
 
   const server = app.listen(port, () => {
     console.log(`API listening on http://localhost:${port}`);
   });
 
+  const stopSessionCleanup = scheduleSessionCleanup();
+
   function onSignal(sig: NodeJS.Signals) {
     console.log(`[lifecycle] received ${sig}, beginning graceful shutdown`);
     beginShutdown();
+    stopSessionCleanup();
 
     const cleanup = async () => {
       try {
