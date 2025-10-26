@@ -40,4 +40,18 @@ describe("errorHandler AppError exposure", () => {
       error: { message: "Bad input", code: "BAD_INPUT" },
     });
   });
+
+  test("returns deterministic forbidden payload for blocked origin", () => {
+    const { res, json } = createMockRes();
+    const err = new AppError("Forbidden", 403, {
+      code: "CORS_ORIGIN_FORBIDDEN",
+    });
+
+    errorHandler(err, {} as any, res as any, vi.fn());
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(json).toHaveBeenCalledWith({
+      error: { message: "Forbidden", code: "CORS_ORIGIN_FORBIDDEN" },
+    });
+  });
 });
