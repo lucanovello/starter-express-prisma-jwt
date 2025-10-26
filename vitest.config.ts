@@ -20,7 +20,7 @@ export default defineConfig({
         lines: 80,
         statements: 80,
         functions: 75,
-        branches: 45,
+        branches: 60,
       },
       exclude: [
         "dist/**",
