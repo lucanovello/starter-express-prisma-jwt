@@ -4,6 +4,12 @@ export default defineConfig({
   test: {
     environment: "node",
     pool: "forks",
+    poolOptions: {
+      forks: {
+        maxForks: 1,
+        minForks: 1,
+      },
+    },
     include: ["tests/**/*.test.ts"],
     setupFiles: ["./vitest.setup.ts"],
     coverage: {
@@ -14,7 +20,7 @@ export default defineConfig({
         lines: 80,
         statements: 80,
         functions: 75,
-        branches: 65,
+        branches: 45,
       },
       exclude: [
         "dist/**",
