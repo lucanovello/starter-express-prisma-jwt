@@ -4,6 +4,7 @@
  * consistent, validated configuration across the application.
  */
 import jwt, {
+  TokenExpiredError,
   type JwtPayload,
   type Secret,
   type SignOptions,
@@ -52,9 +53,36 @@ export function verifyAccess<T extends object = JwtPayload>(token: string): T {
 export function verifyRefresh<T extends object = JwtPayload>(token: string): T {
   try {
     return jwt.verify(token, REFRESH_SECRET) as T;
-  } catch {
+  } catch (err) {
+    if (err instanceof TokenExpiredError) {
+      throw new AppError("Refresh token expired", 401, {
+        code: "SESSION_EXPIRED",
+      });
+    }
     throw new AppError("Invalid refresh token", 401, {
       code: "JWT_REFRESH_INVALID",
     });
   }
+}
+
+export function decodeRefresh<T extends object = JwtPayload>(token: string): T | null {
+  const decoded = jwt.decode(token);
+  if (!decoded || typeof decoded === "string") {
+    return null;
+  }
+  return decoded as T;
+}
+
+export function getTokenExpiration(token: string): Date {
+  const decoded = jwt.decode(token);
+  if (!decoded || typeof decoded === "string") {
+    throw new Error("Unable to decode JWT payload");
+  }
+
+  const payload = decoded as JwtPayload;
+  if (typeof payload.exp !== "number") {
+    throw new Error("JWT payload missing exp claim");
+  }
+
+  return new Date(payload.exp * 1000);
 }

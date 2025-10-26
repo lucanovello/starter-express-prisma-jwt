@@ -1,10 +1,26 @@
+import { randomUUID } from "node:crypto";
+
 import { AppError } from "../lib/errors.js";
-import { signAccess, signRefresh, verifyRefresh } from "../lib/jwt.js";
+import { decodeRefresh, signAccess, signRefresh, verifyRefresh } from "../lib/jwt.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken, tokenEqualsHash } from "../lib/tokenHash.js";
 
 type RefreshClaims = { sub: string; sid: string };
+
+type MintedSessionTokens = {
+  accessToken: string;
+  refreshToken: string;
+  refreshHash: string;
+};
+
+async function mintSessionTokens(userId: string, sessionId: string): Promise<MintedSessionTokens> {
+  const accessToken = signAccess({ sub: userId, sessionId });
+  const refreshToken = signRefresh({ sub: userId, sid: sessionId });
+  const refreshHash = await hashToken(refreshToken);
+
+  return { accessToken, refreshToken, refreshHash };
+}
 
 // -------- Register --------
 export async function register(input: { email: string; password: string }) {
@@ -25,22 +41,19 @@ export async function register(input: { email: string; password: string }) {
         data: { email: emailLc, password: passwordHash },
       });
 
-      const session = await tx.session.create({
-        data: { userId: user.id, valid: true, token: "" }, // placeholder, update next
+      const sessionId = randomUUID();
+      const minted = await mintSessionTokens(user.id, sessionId);
+
+      await tx.session.create({
+        data: {
+          id: sessionId,
+          userId: user.id,
+          valid: true,
+          token: minted.refreshHash,
+        },
       });
 
-      // Now that we have a session id, mint tokens
-      const accessToken = signAccess({ sub: user.id, sessionId: session.id });
-      const refreshToken = signRefresh({ sub: user.id, sid: session.id });
-
-      // Store hash of refresh token on the session
-      const tokenHash = await hashToken(refreshToken);
-      await tx.session.update({
-        where: { id: session.id },
-        data: { token: tokenHash },
-      });
-
-      return { accessToken, refreshToken };
+      return { accessToken: minted.accessToken, refreshToken: minted.refreshToken };
     });
     return { accessToken, refreshToken };
   } catch (err: any) {
@@ -76,19 +89,19 @@ export async function login(input: { email: string; password: string }) {
     });
   }
 
-  const session = await prisma.session.create({
-    data: { userId: user.id, valid: true, token: "" },
+  const sessionId = randomUUID();
+  const minted = await mintSessionTokens(user.id, sessionId);
+
+  await prisma.session.create({
+    data: {
+      id: sessionId,
+      userId: user.id,
+      valid: true,
+      token: minted.refreshHash,
+    },
   });
 
-  const accessToken = signAccess({ sub: user.id, sessionId: session.id });
-  const refreshToken = signRefresh({ sub: user.id, sid: session.id });
-
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { token: await hashToken(refreshToken) },
-  });
-
-  return { accessToken, refreshToken };
+  return { accessToken: minted.accessToken, refreshToken: minted.refreshToken };
 }
 
 // -------- Refresh (rotate) --------
@@ -99,19 +112,37 @@ export async function refresh(incomingRefresh: string) {
     });
   }
 
-  const payload = verifyRefresh<RefreshClaims>(incomingRefresh);
+  const decoded = decodeRefresh<RefreshClaims>(incomingRefresh);
+  const fallbackSessionId = decoded?.sid ?? null;
+
+  let payload: RefreshClaims;
+  try {
+    payload = verifyRefresh<RefreshClaims>(incomingRefresh);
+  } catch (err) {
+    if (
+      err instanceof AppError &&
+      err.code === "SESSION_EXPIRED" &&
+      fallbackSessionId
+    ) {
+      await prisma.session.updateMany({
+        where: { id: fallbackSessionId },
+        data: { valid: false, token: "" },
+      });
+    }
+    throw err;
+  }
+
   const { sub: userId, sid: sessionId } = payload;
 
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
-    include: { user: true },
   });
 
   if (!session || !session.valid) {
     throw new AppError("Invalid session", 401, { code: "SESSION_INVALID" });
   }
 
-  // Reuse detection – must match stored hash
+  // Reuse detection: must match stored hash
   if (!tokenEqualsHash(incomingRefresh, session.token)) {
     // Revoke all user sessions on token reuse (possible theft)
     await prisma.session.updateMany({
@@ -121,16 +152,14 @@ export async function refresh(incomingRefresh: string) {
     throw new AppError("Invalid token", 401, { code: "REFRESH_REUSE" });
   }
 
-  // Mint a new pair (signRefresh adds unique jti so string differs)
-  const accessToken = signAccess({ sub: userId, sessionId });
-  const newRefresh = signRefresh({ sub: userId, sid: sessionId });
+  const minted = await mintSessionTokens(userId, sessionId);
 
   await prisma.session.update({
     where: { id: sessionId },
-    data: { token: await hashToken(newRefresh) },
+    data: { token: minted.refreshHash },
   });
 
-  return { accessToken, refreshToken: newRefresh };
+  return { accessToken: minted.accessToken, refreshToken: minted.refreshToken };
 }
 
 // -------- Logout --------
