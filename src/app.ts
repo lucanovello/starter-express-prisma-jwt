@@ -8,13 +8,14 @@ import express, {
   type NextFunction,
   type RequestHandler,
 } from "express";
+import * as ipaddr from "ipaddr.js";
 import crypto from "node:crypto";
 import pino from "pino";
 import pinoHttp, { type Options } from "pino-http";
 import swaggerUi from "swagger-ui-express";
 
 import { BUILD_VERSION, BUILD_GIT_SHA, BUILD_TIME } from "./build/meta.js";
-import { getConfig } from "./config/index.js";
+import { getConfig, type MetricsGuardConfig } from "./config/index.js";
 import openapi from "./docs/openapi.js";
 import { prisma } from "./lib/prisma.js";
 import { isShuttingDown } from "./lifecycle/state.js";
@@ -28,6 +29,90 @@ import { auth as authRoutes } from "./routes/auth.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 const app = express();
+
+const METRICS_SECRET_HEADER = "x-metrics-secret";
+
+const createMetricsGuard = (guard: MetricsGuardConfig): RequestHandler[] => {
+  if (guard.type === "secret") {
+    const expected = guard.secret;
+    const requireSecret: RequestHandler = (req, res, next) => {
+      const provided = req.get(METRICS_SECRET_HEADER);
+      if (provided !== expected) {
+        return res.status(401).json({
+          error: {
+            message: "Missing or invalid metrics secret",
+            code: provided ? "METRICS_GUARD_INVALID" : "METRICS_GUARD_MISSING",
+          },
+        });
+      }
+      return next();
+    };
+    return [requireSecret];
+  }
+
+  if (guard.type === "cidr") {
+    const requireAllowlist: RequestHandler = (req, res, next) => {
+      const ip = normalizeClientIp(req);
+      if (!ip || !isIpAllowed(ip, guard.allowlist)) {
+        return res.status(403).json({
+          error: {
+            message: "Metrics access forbidden",
+            code: "METRICS_GUARD_FORBIDDEN",
+          },
+        });
+      }
+      return next();
+    };
+    return [requireAllowlist];
+  }
+
+  return [];
+};
+
+const normalizeClientIp = (req: Request): string | null => {
+  const raw = req.ip ?? req.socket?.remoteAddress ?? null;
+  if (!raw) return null;
+  try {
+    const addr = ipaddr.parse(raw);
+    if (addr.kind() === "ipv6" && (addr as ipaddr.IPv6).isIPv4MappedAddress()) {
+      return (addr as ipaddr.IPv6).toIPv4Address().toString();
+    }
+    return addr.toString();
+  } catch {
+    return null;
+  }
+};
+
+const isIpAllowed = (ip: string, allowlist: string[]): boolean => {
+  let parsed: ipaddr.IPv4 | ipaddr.IPv6;
+  try {
+    parsed = ipaddr.parse(ip);
+  } catch {
+    return false;
+  }
+
+  return allowlist.some((cidr) => {
+    try {
+      let [range, prefix] = ipaddr.parseCIDR(cidr);
+      if (range.kind() === "ipv6" && (range as ipaddr.IPv6).isIPv4MappedAddress()) {
+        range = (range as ipaddr.IPv6).toIPv4Address();
+      }
+
+      let candidate: ipaddr.IPv4 | ipaddr.IPv6 = parsed;
+      if (candidate.kind() === "ipv6" && (candidate as ipaddr.IPv6).isIPv4MappedAddress()) {
+        candidate = (candidate as ipaddr.IPv6).toIPv4Address();
+      }
+
+      if (range.kind() !== candidate.kind()) {
+        return false;
+      }
+
+      return candidate.match([range, prefix]);
+    } catch {
+      return false;
+    }
+  });
+};
 
 // Structured logging with request correlation.
 const cfg = getConfig();
@@ -67,12 +152,13 @@ const jsonParser = express.json() as unknown as RequestHandler;
 app.use(jsonParser);
 
 // Security baseline (helmet, CORS, rate limit, etc.)
-registerSecurity(app);
+await registerSecurity(app);
 
 // Metrics: request logging + /metrics endpoint
 app.use(metricsMiddleware);
 if (cfg.NODE_ENV !== "production" || cfg.METRICS_ENABLED === "true") {
-  app.get("/metrics", metricsHandler as RequestHandler);
+  const guardChain = createMetricsGuard(cfg.metricsGuard);
+  app.get("/metrics", ...guardChain, metricsHandler as RequestHandler);
 }
 
 // Attach userId to logs when a valid token is present
