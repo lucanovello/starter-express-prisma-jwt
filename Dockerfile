@@ -27,6 +27,8 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 RUN npm prune --omit=dev
+# Keep Prisma CLI (dev dependency) so migrate deploy works at runtime.
+RUN npm install prisma@6.17.1 --no-save
 
 # ---- Runtime ----
 FROM node:20-alpine AS runner
