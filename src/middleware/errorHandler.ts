@@ -2,10 +2,10 @@
  * Global JSON error handler (must be registered last).
  *
  * Behavior:
- * - ZodError → 400 "Invalid request payload" (+ issues in non-prod).
- * - Invalid JSON (from express.json) → 400 "Invalid JSON".
- * - AppError → status/message/code from the error.
- * - Unknown → 500 "Internal Server Error".
+ * - ZodError -> 400 "Invalid request payload" (+ issues in non-prod).
+ * - Invalid JSON (from express.json) -> 400 "Invalid JSON".
+ * - AppError -> status/message/code from the error.
+ * - Unknown -> 500 "Internal Server Error".
  */
 import { ZodError } from "zod";
 
@@ -19,7 +19,7 @@ const isProd = process.env.NODE_ENV === "production";
 export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
   if (res.headersSent) return next(err);
 
-  // 1) Validation errors from Zod → 400 with stable envelope
+  // 1) Validation errors from Zod -> 400 with stable envelope
   if (err instanceof ZodError) {
     const body: ErrorResponse = {
       error: { message: "Invalid request payload", code: "VALIDATION" },
@@ -42,10 +42,16 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
   // 3) Domain errors
   if (err instanceof AppError) {
     const status = err.statusCode || 400;
+    const expose = err.expose ?? status < 500;
+    const message = expose
+      ? err.message || "Bad Request"
+      : status >= 500
+        ? "Internal Server Error"
+        : "Bad Request";
     const body: ErrorResponse = {
-      error: { message: err.message || "Bad Request" },
+      error: { message },
     };
-    if (err.code) body.error.code = err.code;
+    if (expose && err.code) body.error.code = err.code;
     return res.status(status).json(body);
   }
 
