@@ -7,12 +7,31 @@
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { RedisStore, type SendCommandFn } from "rate-limit-redis";
+import { createClient } from "redis";
 
 import { getConfig } from "../config/index.js";
+import { AppError } from "../lib/errors.js";
 
-import type { Express, RequestHandler } from "express";
+import type { Express, Request, RequestHandler } from "express";
 
-export function registerSecurity(app: Express): void {
+type RateLimitMiddleware = ReturnType<typeof rateLimit>;
+
+const connectRedisClient = async (url: string) => {
+  const client = createClient({ url });
+
+  try {
+    await client.connect();
+  } catch (error) {
+    client.disconnect().catch(() => undefined);
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Unable to connect to rate limit store at ${url}. Reason: ${reason}`);
+  }
+
+  return client;
+};
+
+export async function registerSecurity(app: Express): Promise<void> {
   // Cast once where libs still expose Connect-typed handlers.
   app.use(helmet() as unknown as RequestHandler);
 
@@ -23,42 +42,81 @@ export function registerSecurity(app: Express): void {
     Math.max(1, Math.ceil(rpm * (cfg.RATE_LIMIT_WINDOW_SEC / 60)));
 
   app.use(
-    cors({
-      origin: (origin, cb) => {
-        // Allow same-origin / server-to-server / curl with no Origin header
-        if (!origin) return cb(null, true);
+    cors((req, cb) => {
+      const expressReq = req as Request & {
+        log?: { warn?: (obj: unknown, msg?: string) => void };
+      };
+      const origin = expressReq.get?.("Origin") ?? expressReq.headers.origin;
 
-        // If no allowlist provided, be permissive
-        if (allowlist.length === 0) return cb(null, true);
+      // Allow same-origin / server-to-server / curl with no Origin header
+      if (!origin) {
+        return cb(null, { origin: true, credentials: true });
+      }
 
-        // Otherwise restrict to the allowlist
-        if (allowlist.includes(origin)) return cb(null, true);
+      // If no allowlist provided, be permissive
+      if (allowlist.length === 0) {
+        return cb(null, { origin: true, credentials: true });
+      }
 
-        // Block anything not explicitly allowed
-        return cb(new Error("CORS origin not allowed"), false);
-      },
-      credentials: true,
+      // Otherwise restrict to the allowlist
+      if (allowlist.includes(origin)) {
+        return cb(null, { origin: true, credentials: true });
+      }
+
+      // Block anything not explicitly allowed
+      expressReq.log?.warn?.({ origin }, "Blocked CORS origin");
+
+      return cb(new AppError("Forbidden", 403, { code: "CORS_ORIGIN_FORBIDDEN" }), {
+        credentials: true,
+      });
     }) as RequestHandler
   );
 
+  let globalStore: RedisStore | undefined;
+  let authStore: RedisStore | undefined;
+
+  if (cfg.rateLimitStore.type === "redis") {
+    const client = await connectRedisClient(cfg.rateLimitStore.url);
+    const sendCommand: SendCommandFn = (...args) =>
+      client.sendCommand(args) as ReturnType<SendCommandFn>;
+
+    globalStore = new RedisStore({
+      prefix: "rate-limit:global",
+      sendCommand,
+    });
+    authStore = new RedisStore({
+      prefix: "rate-limit:auth",
+      sendCommand,
+    });
+  }
+
+  const asRequestHandler = (middleware: RateLimitMiddleware): RequestHandler =>
+    middleware as RequestHandler;
+
   // Global limiter
   app.use(
-    rateLimit({
-      windowMs,
-      max: toMax(cfg.RATE_LIMIT_RPM),
-      standardHeaders: true,
-      legacyHeaders: false,
-    }) as RequestHandler
+    asRequestHandler(
+      rateLimit({
+        windowMs,
+        max: toMax(cfg.RATE_LIMIT_RPM),
+        standardHeaders: true,
+        legacyHeaders: false,
+        store: globalStore,
+      })
+    )
   );
 
   // Stricter limiter for auth endpoints
   app.use(
     "/auth",
-    rateLimit({
-      windowMs,
-      max: toMax(cfg.RATE_LIMIT_RPM_AUTH),
-      standardHeaders: true,
-      legacyHeaders: false,
-    }) as RequestHandler
+    asRequestHandler(
+      rateLimit({
+        windowMs,
+        max: toMax(cfg.RATE_LIMIT_RPM_AUTH),
+        standardHeaders: true,
+        legacyHeaders: false,
+        store: authStore,
+      })
+    )
   );
 }
