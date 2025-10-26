@@ -24,7 +24,7 @@ const httpRequestDuration = new client.Histogram({
   name: "http_request_duration_seconds",
   help: "Duration of HTTP requests in seconds",
   labelNames: ["method", "route", "status_code"] as const,
-  // Sane buckets for web latency: 5ms → 5s
+  // Sane buckets for web latency: 5ms -> 5s
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
 });
 
@@ -42,9 +42,20 @@ export function metricsMiddleware(
     const durationNs = Number(process.hrtime.bigint() - start);
     const durationSeconds = durationNs / 1e9;
 
-    // When Express matches a route, req.route.path is set (e.g. "/auth/login").
-    // If not available (e.g. 404), fall back to req.path.
-    const route = (req.route?.path as string) ?? req.path ?? "unknown";
+    /**
+     * When Express matches a route, req.route.path is relative to the router (e.g. "/login").
+     * Include req.baseUrl so mounted routers (/auth) report correctly; otherwise fall back to req.path.
+     */
+    const routePath = typeof req.route?.path === "string" ? req.route.path : "";
+    const rawUrl = req.originalUrl?.split("?")[0] ?? "";
+    const derivedBase =
+      routePath && rawUrl.endsWith(routePath)
+        ? rawUrl.slice(0, rawUrl.length - routePath.length)
+        : "";
+    const base = derivedBase || req.baseUrl || "";
+    const primaryRoute = routePath.length > 0 ? `${base}${routePath}` : undefined;
+    const fallbackPath = req.path ?? rawUrl;
+    const route = primaryRoute ?? fallbackPath ?? "unknown";
     const labels = {
       method: req.method,
       route,
