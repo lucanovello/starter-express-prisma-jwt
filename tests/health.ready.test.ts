@@ -1,5 +1,6 @@
 import { test, expect, beforeAll } from "vitest";
 import request from "supertest";
+import { resetDb } from "./utils/db.js";
 
 let app: any;
 
@@ -9,6 +10,8 @@ beforeAll(async () => {
   process.env.JWT_REFRESH_SECRET ??= "test-refresh";
   process.env.JWT_ACCESS_EXPIRY ??= "15m";
   process.env.JWT_REFRESH_EXPIRY ??= "7d";
+
+  await resetDb();
 
   const mod = await import("../src/app.js");
   app = mod.default;
