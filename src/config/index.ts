@@ -44,6 +44,10 @@ const EnvSchema = z.object({
   METRICS_GUARD_SECRET: z.string().optional(),
   METRICS_GUARD_ALLOWLIST: z.string().optional(),
   SESSION_CLEANUP_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
+  REQUEST_BODY_LIMIT: z.string().default("100kb"),
+  HTTP_SERVER_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  HTTP_SERVER_HEADERS_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  HTTP_SERVER_KEEPALIVE_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
 }).superRefine((data, ctx) => {
   if (data.METRICS_GUARD === "secret") {
     const secret = data.METRICS_GUARD_SECRET?.trim();
@@ -95,6 +99,25 @@ const EnvSchema = z.object({
       message: "RATE_LIMIT_REDIS_URL cannot be blank",
     });
   }
+
+  if (data.NODE_ENV === "production") {
+    const allowlist = splitCommaSeparated(data.CORS_ORIGINS);
+    if (allowlist.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["CORS_ORIGINS"],
+        message: "Set CORS_ORIGINS with at least one allowed origin in production",
+      });
+    }
+    const redisUrl = data.RATE_LIMIT_REDIS_URL?.trim();
+    if (!redisUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["RATE_LIMIT_REDIS_URL"],
+        message: "RATE_LIMIT_REDIS_URL is required in production",
+      });
+    }
+  }
 });
 
 export class ConfigError extends Error {
@@ -127,10 +150,7 @@ export function getConfig(): AppConfig {
     throw new ConfigError(errors);
   }
   const cfg = parsed.data;
-  const corsOriginsParsed = (cfg.CORS_ORIGINS ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const corsOriginsParsed = splitCommaSeparated(cfg.CORS_ORIGINS);
   const metricsGuard: MetricsGuardConfig =
     cfg.METRICS_GUARD === "secret"
       ? { type: "secret", secret: cfg.METRICS_GUARD_SECRET!.trim() }

@@ -37,6 +37,8 @@ export async function registerSecurity(app: Express): Promise<void> {
 
   const cfg = getConfig();
   const allowlist = cfg.corsOriginsParsed;
+  const isProd = cfg.NODE_ENV === "production";
+  const allowUnknownOrigins = !isProd && allowlist.length === 0;
   const windowMs = cfg.RATE_LIMIT_WINDOW_SEC * 1000;
   const toMax = (rpm: number) =>
     Math.max(1, Math.ceil(rpm * (cfg.RATE_LIMIT_WINDOW_SEC / 60)));
@@ -53,13 +55,13 @@ export async function registerSecurity(app: Express): Promise<void> {
         return cb(null, { origin: true, credentials: true });
       }
 
-      // If no allowlist provided, be permissive
-      if (allowlist.length === 0) {
+      // Otherwise restrict to the allowlist
+      if (allowlist.includes(origin)) {
         return cb(null, { origin: true, credentials: true });
       }
 
-      // Otherwise restrict to the allowlist
-      if (allowlist.includes(origin)) {
+      if (allowUnknownOrigins) {
+        // Preserve existing DX in dev/test with no allowlist specified.
         return cb(null, { origin: true, credentials: true });
       }
 
@@ -88,6 +90,8 @@ export async function registerSecurity(app: Express): Promise<void> {
       prefix: "rate-limit:auth",
       sendCommand,
     });
+  } else if (isProd) {
+    throw new Error("Misconfigured rate limit store: production requires Redis backing store");
   }
 
   const asRequestHandler = (middleware: RateLimitMiddleware): RequestHandler =>
