@@ -12,6 +12,10 @@ model User {
   email     String    @unique
   password  String   
   sessions  Session[]
+  emailVerifiedAt DateTime?
+  verificationTokens VerificationToken[]
+  passwordResetTokens PasswordResetToken[]
+  loginAttempts LoginAttempt[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -26,4 +30,47 @@ model Session {
   updatedAt DateTime  @updatedAt
 
   @@index([userId])
+}
+
+model VerificationToken {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  id             String   @id @default(uuid())
+  user           User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String?
+  emailLowercase String
+  ipAddress      String
+  failCount      Int      @default(0)
+  lockedUntil    DateTime?
+  firstFailedAt  DateTime @default(now())
+  lastFailedAt   DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([emailLowercase, ipAddress])
+  @@index([lockedUntil])
 }

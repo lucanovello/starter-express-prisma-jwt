@@ -1,10 +1,13 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
+import { getConfig } from "../config/index.js";
 import { AppError } from "../lib/errors.js";
-import { decodeRefresh, signAccess, signRefresh, verifyRefresh } from "../lib/jwt.js";
+import { decodeRefresh, signAccess, signRefresh, verifyAccess, verifyRefresh } from "../lib/jwt.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken, tokenEqualsHash } from "../lib/tokenHash.js";
+
+import type { Prisma } from "@prisma/client";
 
 type RefreshClaims = { sub: string; sid: string };
 
@@ -14,6 +17,47 @@ type MintedSessionTokens = {
   refreshHash: string;
 };
 
+type RegisterResult = {
+  accessToken?: string;
+  refreshToken?: string;
+  emailVerificationRequired: boolean;
+  verificationToken?: string;
+};
+
+type LoginContext = {
+  ipAddress: string;
+};
+
+type SessionSummary = {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  valid: boolean;
+  current: boolean;
+};
+
+type AuthConfig = ReturnType<typeof getConfig>["auth"];
+
+const TOKEN_BYTES = 32;
+
+const makeLoginError = () =>
+  new AppError("Invalid credentials", 401, {
+    code: "INVALID_CREDENTIALS",
+  });
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function sanitizeIp(ip: string | undefined | null): string {
+  if (!ip) return "unknown";
+  return ip.slice(0, 128);
+}
+
+function generateToken(): string {
+  return randomBytes(TOKEN_BYTES).toString("base64url");
+}
+
 async function mintSessionTokens(userId: string, sessionId: string): Promise<MintedSessionTokens> {
   const accessToken = signAccess({ sub: userId, sessionId });
   const refreshToken = signRefresh({ sub: userId, sid: sessionId });
@@ -22,24 +66,199 @@ async function mintSessionTokens(userId: string, sessionId: string): Promise<Min
   return { accessToken, refreshToken, refreshHash };
 }
 
+async function createVerificationToken(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  auth: AuthConfig,
+): Promise<string> {
+  await tx.verificationToken.updateMany({
+    where: { userId, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  const expiresAt = new Date(Date.now() + auth.emailVerificationTtlMs);
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const rawToken = generateToken();
+    const tokenHash = await hashToken(rawToken);
+    try {
+      await tx.verificationToken.create({
+        data: {
+          userId,
+          tokenHash,
+          expiresAt,
+        },
+      });
+      return rawToken;
+    } catch (err: any) {
+      if (err?.code === "P2002") continue;
+      throw err;
+    }
+  }
+
+  throw new Error("Unable to create verification token");
+}
+
+async function createPasswordResetToken(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  auth: AuthConfig,
+): Promise<string> {
+  await tx.passwordResetToken.updateMany({
+    where: { userId, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  const expiresAt = new Date(Date.now() + auth.passwordResetTtlMs);
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const rawToken = generateToken();
+    const tokenHash = await hashToken(rawToken);
+    try {
+      await tx.passwordResetToken.create({
+        data: {
+          userId,
+          tokenHash,
+          expiresAt,
+        },
+      });
+      return rawToken;
+    } catch (err: any) {
+      if (err?.code === "P2002") continue;
+      throw err;
+    }
+  }
+
+  throw new Error("Unable to create password reset token");
+}
+
+async function ensureLoginNotLocked(
+  emailLowercase: string,
+  ipAddress: string,
+  auth: AuthConfig,
+): Promise<void> {
+  const key = { emailLowercase, ipAddress };
+  const attempt = await prisma.loginAttempt.findUnique({
+    where: { emailLowercase_ipAddress: key },
+  });
+  if (!attempt) return;
+
+  const now = new Date();
+
+  if (attempt.lockedUntil && attempt.lockedUntil > now) {
+    throw new AppError("Too many login attempts. Try again later.", 429, {
+      code: "LOGIN_LOCKED",
+    });
+  }
+
+  if (
+    attempt.lockedUntil ||
+    now.getTime() - attempt.lastFailedAt.getTime() > auth.loginAttemptWindowMs
+  ) {
+    await prisma.loginAttempt
+      .delete({ where: { emailLowercase_ipAddress: key } })
+      .catch(() => undefined);
+  }
+}
+
+async function recordLoginFailure(
+  emailLowercase: string,
+  ipAddress: string,
+  userId: string | null,
+  auth: AuthConfig,
+): Promise<void> {
+  const key = { emailLowercase, ipAddress };
+  const attempt = await prisma.loginAttempt.findUnique({
+    where: { emailLowercase_ipAddress: key },
+  });
+  const now = new Date();
+  const withinWindow =
+    attempt && now.getTime() - attempt.lastFailedAt.getTime() <= auth.loginAttemptWindowMs;
+
+  const failCount = withinWindow ? attempt!.failCount + 1 : 1;
+  const shouldLock = failCount >= auth.loginMaxAttempts;
+  const lockedUntil = shouldLock ? new Date(now.getTime() + auth.loginLockoutMs) : null;
+
+  if (!attempt) {
+    await prisma.loginAttempt.create({
+      data: {
+        emailLowercase,
+        ipAddress,
+        failCount,
+        firstFailedAt: now,
+        lastFailedAt: now,
+        lockedUntil,
+        userId: userId ?? undefined,
+      },
+    });
+    return;
+  }
+
+  if (!withinWindow || attempt.lockedUntil) {
+    await prisma.loginAttempt.update({
+      where: { emailLowercase_ipAddress: key },
+      data: {
+        failCount: 1,
+        firstFailedAt: now,
+        lastFailedAt: now,
+        lockedUntil,
+        userId: attempt.userId ?? userId ?? undefined,
+      },
+    });
+    return;
+  }
+
+  await prisma.loginAttempt.update({
+    where: { emailLowercase_ipAddress: key },
+    data: {
+      failCount,
+      lastFailedAt: now,
+      lockedUntil,
+      userId: attempt.userId ?? userId ?? undefined,
+    },
+  });
+}
+
+async function clearLoginAttempts(emailLowercase: string, ipAddress: string): Promise<void> {
+  await prisma.loginAttempt
+    .delete({ where: { emailLowercase_ipAddress: { emailLowercase, ipAddress } } })
+    .catch(() => undefined);
+}
+
 // -------- Register --------
-export async function register(input: { email: string; password: string }) {
+export async function register(input: { email: string; password: string }): Promise<RegisterResult> {
   const { email, password } = input;
+  const emailLowercase = normalizeEmail(email);
 
-  const emailLc = email.toLowerCase();
-
-  const existing = await prisma.user.findUnique({ where: { email: emailLc } });
+  const existing = await prisma.user.findUnique({ where: { email: emailLowercase } });
   if (existing) {
     throw new AppError("Email already registered", 409, { code: "EMAIL_TAKEN" });
   }
 
   const passwordHash = await hashPassword(password);
+  const auth = getConfig().auth;
 
   try {
-    const { accessToken, refreshToken } = await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email: emailLc, password: passwordHash },
+        data: {
+          email: emailLowercase,
+          password: passwordHash,
+          emailVerifiedAt: auth.emailVerificationRequired ? null : new Date(),
+        },
       });
+
+      let verificationToken: string | undefined;
+      if (auth.emailVerificationRequired) {
+        verificationToken = await createVerificationToken(tx, user.id, auth);
+      }
+
+      if (auth.emailVerificationRequired) {
+        return {
+          emailVerificationRequired: true,
+          verificationToken,
+        };
+      }
 
       const sessionId = randomUUID();
       const minted = await mintSessionTokens(user.id, sessionId);
@@ -53,15 +272,17 @@ export async function register(input: { email: string; password: string }) {
         },
       });
 
-      return { accessToken: minted.accessToken, refreshToken: minted.refreshToken };
+      return {
+        accessToken: minted.accessToken,
+        refreshToken: minted.refreshToken,
+        emailVerificationRequired: false,
+        verificationToken,
+      };
     });
-    return { accessToken, refreshToken };
   } catch (err: any) {
     if (err?.code === "P2002") {
-      const t = Array.isArray(err.meta?.target)
-        ? err.meta.target.join(",")
-        : (err.meta?.target ?? "");
-      if (String(t).includes("email")) {
+      const target = Array.isArray(err.meta?.target) ? err.meta.target.join(",") : err.meta?.target;
+      if (String(target ?? "").includes("email")) {
         throw new AppError("Email already registered", 409, { code: "EMAIL_TAKEN" });
       }
     }
@@ -70,24 +291,32 @@ export async function register(input: { email: string; password: string }) {
 }
 
 // -------- Login --------
-export async function login(input: { email: string; password: string }) {
-  const { email, password } = input;
-  // Find the user case-insensitively by email
+export async function login(
+  input: { email: string; password: string },
+  context: LoginContext,
+) {
+  const auth = getConfig().auth;
+  const emailLowercase = normalizeEmail(input.email);
+  const ipAddress = sanitizeIp(context.ipAddress);
+
+  await ensureLoginNotLocked(emailLowercase, ipAddress, auth);
+
   const user = await prisma.user.findFirst({
-    where: { email: { equals: email, mode: "insensitive" } },
+    where: { email: { equals: input.email, mode: "insensitive" } },
   });
+
   if (!user) {
-    throw new AppError("Invalid credentials", 401, {
-      code: "INVALID_CREDENTIALS",
-    });
+    await recordLoginFailure(emailLowercase, ipAddress, null, auth);
+    throw makeLoginError();
   }
 
-  const ok = await verifyPassword(user.password, password);
-  if (!ok) {
-    throw new AppError("Invalid credentials", 401, {
-      code: "INVALID_CREDENTIALS",
-    });
+  const ok = await verifyPassword(user.password, input.password);
+  if (!ok || (auth.emailVerificationRequired && !user.emailVerifiedAt)) {
+    await recordLoginFailure(emailLowercase, ipAddress, user.id, auth);
+    throw makeLoginError();
   }
+
+  await clearLoginAttempts(emailLowercase, ipAddress);
 
   const sessionId = randomUUID();
   const minted = await mintSessionTokens(user.id, sessionId);
@@ -178,4 +407,155 @@ export async function logout(incomingRefresh: string) {
   } catch {
     // ignore bogus tokens; logout is idempotent
   }
+}
+
+// -------- Email verification --------
+export async function verifyEmail(token: string): Promise<void> {
+  const tokenHash = await hashToken(token);
+  const record = await prisma.verificationToken.findUnique({
+    where: { tokenHash },
+    include: { user: true },
+  });
+
+  if (!record || record.usedAt) {
+    throw new AppError("Invalid verification token", 400, {
+      code: "EMAIL_VERIFICATION_INVALID",
+    });
+  }
+
+  const now = new Date();
+  if (record.expiresAt <= now) {
+    await prisma.verificationToken
+      .update({
+        where: { id: record.id },
+        data: { usedAt: now },
+      })
+      .catch(() => undefined);
+    throw new AppError("Verification token expired", 400, {
+      code: "EMAIL_VERIFICATION_EXPIRED",
+    });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (!record.user.emailVerifiedAt) {
+      await tx.user.update({
+        where: { id: record.userId },
+        data: { emailVerifiedAt: now },
+      });
+    }
+    await tx.verificationToken.update({
+      where: { id: record.id },
+      data: { usedAt: now },
+    });
+    await tx.verificationToken.updateMany({
+      where: { userId: record.userId, usedAt: null },
+      data: { usedAt: now },
+    });
+  });
+}
+
+export async function requestPasswordReset(
+  email: string,
+): Promise<{ token?: string }> {
+  const auth = getConfig().auth;
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+    select: { id: true },
+  });
+
+  if (!user) {
+    return {};
+  }
+
+  const token = await prisma.$transaction(async (tx) =>
+    createPasswordResetToken(tx, user.id, auth),
+  );
+
+  return { token };
+}
+
+export async function resetPassword(input: { token: string; password: string }): Promise<void> {
+  const tokenHash = await hashToken(input.token);
+  const record = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+    include: { user: { select: { id: true } } },
+  });
+
+  if (!record || record.usedAt) {
+    throw new AppError("Invalid reset token", 400, {
+      code: "PASSWORD_RESET_INVALID",
+    });
+  }
+
+  const now = new Date();
+  if (record.expiresAt <= now) {
+    await prisma.passwordResetToken
+      .update({
+        where: { id: record.id },
+        data: { usedAt: now },
+      })
+      .catch(() => undefined);
+    throw new AppError("Reset token expired", 400, {
+      code: "PASSWORD_RESET_EXPIRED",
+    });
+  }
+
+  const passwordHash = await hashPassword(input.password);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.passwordResetToken.update({
+      where: { id: record.id },
+      data: { usedAt: now },
+    });
+    await tx.passwordResetToken.updateMany({
+      where: { userId: record.userId, usedAt: null },
+      data: { usedAt: now },
+    });
+    await tx.user.update({
+      where: { id: record.userId },
+      data: { password: passwordHash },
+    });
+    await tx.session.updateMany({
+      where: { userId: record.userId },
+      data: { valid: false, token: "" },
+    });
+  });
+}
+
+export function authenticateAccessToken(token: string): { userId: string; sessionId: string | null } {
+  if (!token) {
+    throw new AppError("Unauthorized", 401, { code: "UNAUTHORIZED" });
+  }
+
+  const payload = verifyAccess<{ sub?: string; userId?: string; sessionId?: string }>(token);
+  const userId = payload.sub ?? payload.userId;
+  if (!userId) {
+    throw new AppError("Invalid access token", 401, { code: "JWT_ACCESS_INVALID" });
+  }
+
+  const sessionId = typeof payload.sessionId === "string" ? payload.sessionId : null;
+  return { userId, sessionId };
+}
+
+export async function listSessions(userId: string, currentSessionId: string | null): Promise<SessionSummary[]> {
+  const sessions = await prisma.session.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return sessions.map((session) => ({
+    id: session.id,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    valid: session.valid,
+    current: currentSessionId != null && session.id === currentSessionId,
+  }));
+}
+
+export async function logoutAll(userId: string): Promise<number> {
+  const result = await prisma.session.updateMany({
+    where: { userId },
+    data: { valid: false, token: "" },
+  });
+  return result.count;
 }

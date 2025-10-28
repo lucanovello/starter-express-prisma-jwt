@@ -48,6 +48,12 @@ const EnvSchema = z.object({
   HTTP_SERVER_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   HTTP_SERVER_HEADERS_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   HTTP_SERVER_KEEPALIVE_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+  AUTH_EMAIL_VERIFICATION_REQUIRED: z.coerce.boolean().default(false),
+  AUTH_EMAIL_VERIFICATION_TTL_MINUTES: z.coerce.number().int().positive().default(60),
+  AUTH_PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
+  AUTH_LOGIN_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  AUTH_LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
+  AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES: z.coerce.number().int().positive().default(15),
 }).superRefine((data, ctx) => {
   if (data.METRICS_GUARD === "secret") {
     const secret = data.METRICS_GUARD_SECRET?.trim();
@@ -130,6 +136,14 @@ export type AppConfig = z.infer<typeof EnvSchema> & {
   corsOriginsParsed: string[];
   metricsGuard: MetricsGuardConfig;
   rateLimitStore: RateLimitStoreConfig;
+  auth: {
+    emailVerificationRequired: boolean;
+    emailVerificationTtlMs: number;
+    passwordResetTtlMs: number;
+    loginMaxAttempts: number;
+    loginLockoutMs: number;
+    loginAttemptWindowMs: number;
+  };
 };
 
 export type MetricsGuardConfig =
@@ -166,6 +180,19 @@ export function getConfig(): AppConfig {
     ? { type: "redis", url: redisUrl }
     : { type: "memory" };
 
-  cached = { ...cfg, corsOriginsParsed, metricsGuard, rateLimitStore };
+  const auth = {
+    emailVerificationRequired: cfg.AUTH_EMAIL_VERIFICATION_REQUIRED,
+    emailVerificationTtlMs: cfg.AUTH_EMAIL_VERIFICATION_TTL_MINUTES * 60 * 1000,
+    passwordResetTtlMs: cfg.AUTH_PASSWORD_RESET_TTL_MINUTES * 60 * 1000,
+    loginMaxAttempts: cfg.AUTH_LOGIN_MAX_ATTEMPTS,
+    loginLockoutMs: cfg.AUTH_LOGIN_LOCKOUT_MINUTES * 60 * 1000,
+    loginAttemptWindowMs: cfg.AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES * 60 * 1000,
+  };
+
+  cached = { ...cfg, corsOriginsParsed, metricsGuard, rateLimitStore, auth };
   return cached!;
+}
+
+export function resetConfigCache(): void {
+  cached = null;
 }
