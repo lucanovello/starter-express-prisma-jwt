@@ -2,7 +2,7 @@
  * Server entrypoint. Keep process boot isolated from tests.
  */
 import "dotenv/config";
-import { ConfigError } from "./config/index.js";
+import { ConfigError, getConfig } from "./config/index.js";
 import { prisma } from "./lib/prisma.js";
 import { beginShutdown } from "./lifecycle/state.js";
 
@@ -18,6 +18,10 @@ async function main() {
   const server = app.listen(port, () => {
     console.log(`API listening on http://localhost:${port}`);
   });
+  const cfg = getConfig();
+  server.keepAliveTimeout = cfg.HTTP_SERVER_KEEPALIVE_TIMEOUT_MS;
+  server.headersTimeout = cfg.HTTP_SERVER_HEADERS_TIMEOUT_MS;
+  server.requestTimeout = cfg.HTTP_SERVER_REQUEST_TIMEOUT_MS;
 
   const stopSessionCleanup = scheduleSessionCleanup();
 

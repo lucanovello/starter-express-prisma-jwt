@@ -10,7 +10,7 @@ import express, {
 } from "express";
 import * as ipaddr from "ipaddr.js";
 import crypto from "node:crypto";
-import pino from "pino";
+import pino, { type LoggerOptions } from "pino";
 import pinoHttp, { type Options } from "pino-http";
 import swaggerUi from "swagger-ui-express";
 
@@ -116,10 +116,37 @@ const isIpAllowed = (ip: string, allowlist: string[]): boolean => {
 
 // Structured logging with request correlation.
 const cfg = getConfig();
+const redactionPaths = [
+  "req.headers.authorization",
+  "req.headers.cookie",
+  "req.headers['set-cookie']",
+  "res.headers['set-cookie']",
+  "req.body.password",
+  "req.body.passwordConfirmation",
+  "req.body.currentPassword",
+  "req.body.newPassword",
+  "req.body.refreshToken",
+  "req.body.refresh_token",
+  "req.body.smtpPass",
+  "req.body.smtpPassword",
+  "req.body.clientSecret",
+  "req.body.client_secret",
+] as const;
+
+export const LOG_REDACTION_PATHS = redactionPaths;
+
+const baseLoggerOptions: LoggerOptions = {
+  level: cfg.LOG_LEVEL,
+  redact: {
+    paths: [...redactionPaths],
+    censor: "[REDACTED]",
+  },
+};
+
 const logger = pino(
   cfg.NODE_ENV === "production"
-    ? { level: cfg.LOG_LEVEL }
-    : { level: cfg.LOG_LEVEL, transport: { target: "pino-pretty" } },
+    ? baseLoggerOptions
+    : { ...baseLoggerOptions, transport: { target: "pino-pretty" } },
 );
 
 const pinoOptions: Options<IncomingMessage, ServerResponse<IncomingMessage>> = {
@@ -129,6 +156,10 @@ const pinoOptions: Options<IncomingMessage, ServerResponse<IncomingMessage>> = {
     // Express adds res.locals; not present on ServerResponse types.
     const anyRes = res as unknown as { locals?: Record<string, unknown> };
     return { userId: anyRes.locals?.userId };
+  },
+  redact: {
+    paths: [...redactionPaths],
+    censor: "[REDACTED]",
   },
 };
 
@@ -148,7 +179,7 @@ const echoRequestId: RequestHandler = (req: Request, res: Response, next: NextFu
 app.use(echoRequestId);
 
 // express.json() needs a cast for Express 5 + connect-style types.
-const jsonParser = express.json() as unknown as RequestHandler;
+const jsonParser = express.json({ limit: cfg.REQUEST_BODY_LIMIT }) as unknown as RequestHandler;
 app.use(jsonParser);
 
 // Security baseline (helmet, CORS, rate limit, etc.)
