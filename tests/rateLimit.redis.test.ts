@@ -210,4 +210,3 @@ test("application fails fast when the redis store is unreachable", async () => {
   await expect(import("../src/app.js")).rejects.toThrow(/rate limit store/i);
 });
 
-

@@ -78,6 +78,8 @@ export async function registerSecurity(app: Express): Promise<void> {
   let authStore: RedisStore | undefined;
 
   if (cfg.rateLimitStore.type === "redis") {
+    // In test environments we deliberately avoid connecting to Redis to keep tests hermetic and fast.
+    // With store undefined, express-rate-limit falls back to in-memory store. In production, a Redis store is required.
     if (cfg.NODE_ENV !== "test") {
       const client = await connectRedisClient(cfg.rateLimitStore.url);
       const sendCommand: SendCommandFn = (...args) =>
