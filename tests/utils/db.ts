@@ -128,7 +128,7 @@ export async function resetDb() {
   const run = async () => {
     await ensureDatabaseReady();
     await prisma.$executeRawUnsafe(
-      'TRUNCATE TABLE "Session","User" RESTART IDENTITY CASCADE;'
+      'TRUNCATE TABLE "LoginAttempt","PasswordResetToken","VerificationToken","Session","User" RESTART IDENTITY CASCADE;'
     );
   };
 

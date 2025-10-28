@@ -5,6 +5,7 @@ import request from "supertest";
 type RateLimitInfo = { totalHits: number; resetTime: Date };
 
 const RATE_ENV_VARS = [
+  "CORS_ORIGINS",
   "RATE_LIMIT_REDIS_URL",
   "RATE_LIMIT_RPM",
   "RATE_LIMIT_RPM_AUTH",
@@ -12,6 +13,8 @@ const RATE_ENV_VARS = [
 ];
 
 const originalEnv: Record<string, string | undefined> = {};
+const originalNodeEnv = process.env.NODE_ENV;
+
 
 beforeAll(() => {
   for (const key of RATE_ENV_VARS) {
@@ -26,6 +29,8 @@ beforeEach(() => {
   for (const key of RATE_ENV_VARS) {
     delete process.env[key];
   }
+  process.env.NODE_ENV = "production";
+  process.env.CORS_ORIGINS = "http://localhost";
 });
 
 afterEach(() => {
@@ -41,6 +46,11 @@ afterEach(() => {
     } else {
       process.env[key] = value;
     }
+  }
+  if (originalNodeEnv === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = originalNodeEnv;
   }
 });
 
@@ -199,3 +209,5 @@ test("application fails fast when the redis store is unreachable", async () => {
 
   await expect(import("../src/app.js")).rejects.toThrow(/rate limit store/i);
 });
+
+

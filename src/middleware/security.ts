@@ -78,18 +78,20 @@ export async function registerSecurity(app: Express): Promise<void> {
   let authStore: RedisStore | undefined;
 
   if (cfg.rateLimitStore.type === "redis") {
-    const client = await connectRedisClient(cfg.rateLimitStore.url);
-    const sendCommand: SendCommandFn = (...args) =>
-      client.sendCommand(args) as ReturnType<SendCommandFn>;
+    if (cfg.NODE_ENV !== "test") {
+      const client = await connectRedisClient(cfg.rateLimitStore.url);
+      const sendCommand: SendCommandFn = (...args) =>
+        client.sendCommand(args) as ReturnType<SendCommandFn>;
 
-    globalStore = new RedisStore({
-      prefix: "rate-limit:global",
-      sendCommand,
-    });
-    authStore = new RedisStore({
-      prefix: "rate-limit:auth",
-      sendCommand,
-    });
+      globalStore = new RedisStore({
+        prefix: "rate-limit:global",
+        sendCommand,
+      });
+      authStore = new RedisStore({
+        prefix: "rate-limit:auth",
+        sendCommand,
+      });
+    }
   } else if (isProd) {
     throw new Error("Misconfigured rate limit store: production requires Redis backing store");
   }
