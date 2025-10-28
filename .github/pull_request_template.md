@@ -1,24 +1,25 @@
-## Summary
+# Summary
 
-## Commands
+<one-liner>
+
+## Changes
+
+- <bullets>
+
+## Testing
 
 ```bash
-cp .env.example .env
-npm ci
-npm run dev
+npm run typecheck && npm run lint && npm test
+Links
+Closes #<issue>
 ```
 
-## Files touched
+## Links
 
-- src/app.ts
-- package.json
+- Closes #<issue>
 
 ## Checklist
 
-- [] Changes scoped to this story
-- [] App boots; /health returns 200 and includes x-request-id
-
-## Acceptance criteria
-
-- Clients receive x-request-id on responses
-- No Express 5 typing errors (compiles cleanly)
+- [ ] No secrets in diff
+- [ ] Docs updated if needed
+- [ ] CI green

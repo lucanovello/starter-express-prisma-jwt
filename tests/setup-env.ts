@@ -10,6 +10,7 @@ loadEnv({ path: resolve(process.cwd(), envPath) });
 
 process.env.DATABASE_URL ??=
   "postgresql://postgres:postgres@localhost:5432/postgres_test?schema=public";
+delete process.env.RATE_LIMIT_REDIS_URL;
 
 export function assertSafeTestDatabaseUrl(databaseUrl: string | undefined) {
   if (!databaseUrl) {
