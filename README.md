@@ -1,4 +1,4 @@
-# Starter: Express + Prisma + JWT
+﻿# Starter: Express + Prisma + JWT
 
 [![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
 
@@ -29,11 +29,18 @@ npm run dev
 npm test
 npm run test:cov  # uploads lcov artifact in CI
 ```
+## API docs & clients
+
+- OpenAPI is served at `GET /openapi.json` and Swagger UI is available at `/docs` in non-production environments only.
+- Regenerate the JSON locally with `npm run build && node scripts/generate-openapi.mjs`; the file is written to `./openapi.json` for sharing or client generation.
+- CI publishes the `openapi.json` artifact on every successful run so releases can attach the spec without rebuilding.
+- Postman: **File -> Import -> File**, choose `openapi.json`, then pick *Generate collection*.
+- Insomnia: **Application -> Preferences -> Data -> Import Data -> From File**, select `openapi.json` and import as a new workspace.
 
 ## Health
 
-- `GET /health` → `200 {"status":"ok"}`
-- `GET /ready` → `200 {"status":"ready"}` when DB responds, else `503 {"error":{"message":"Not Ready","code":"NOT_READY"}}`
+- `GET /health` â†’ `200 {"status":"ok"}`
+- `GET /ready` â†’ `200 {"status":"ready"}` when DB responds, else `503 {"error":{"message":"Not Ready","code":"NOT_READY"}}`
 
 ## Env
 
@@ -136,7 +143,9 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 - Deploy behind a TLS-terminating reverse proxy or CDN that enforces HSTS and handles TLS certificates.
 - Ensure the proxy forwards `x-forwarded-*` headers and configure `trust proxy` if you terminate TLS upstream.
 - Apply additional security headers (e.g. HSTS, CSP) at the edge where you control cache and domain policy.
-
 ## Version
 
-- `GET /version` → `{ version, gitSha, buildTime }`
+- `GET /version` -> `{ version, gitSha, buildTime }`
+- Versioning policy: routes are treated as **v1** today. Mount behind `/v1` at the gateway and reserve new `/v{n}` prefixes for breaking changes.
+
+

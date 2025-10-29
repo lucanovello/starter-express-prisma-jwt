@@ -3,12 +3,7 @@
  * Reads secrets/expiries from the central config module to ensure
  * consistent, validated configuration across the application.
  */
-import jwt, {
-  TokenExpiredError,
-  type JwtPayload,
-  type Secret,
-  type SignOptions,
-} from "jsonwebtoken";
+import jwt, { type JwtPayload, type Secret, type SignOptions } from "jsonwebtoken";
 import { randomUUID } from "node:crypto";
 
 import { getConfig } from "../config/index.js";
@@ -54,7 +49,12 @@ export function verifyRefresh<T extends object = JwtPayload>(token: string): T {
   try {
     return jwt.verify(token, REFRESH_SECRET) as T;
   } catch (err) {
-    if (err instanceof TokenExpiredError) {
+    if (
+      err instanceof Error &&
+      // jsonwebtoken is CommonJS; when imported in ESM the error class is exposed on the default export
+      // so we detect the token expiry by name to avoid import interop issues.
+      (err as any)?.name === "TokenExpiredError"
+    ) {
       throw new AppError("Refresh token expired", 401, {
         code: "SESSION_EXPIRED",
       });
