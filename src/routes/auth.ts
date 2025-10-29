@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 
 import {
   LoginSchema,
@@ -13,6 +13,15 @@ import { requireAuth } from "../middleware/requireAuth.js";
 import * as Auth from "../services/authService.js";
 
 export const auth = Router();
+
+const requireAccessToken = (req: Request) => {
+  const header = req.headers.authorization ?? "";
+  if (!header.startsWith("Bearer ")) {
+    throw new AppError("Unauthorized", 401, { code: "UNAUTHORIZED" });
+  }
+  const token = header.slice(7);
+  return Auth.authenticateAccessToken(token);
+};
 
 // Register
 auth.post("/register", async (req, res, next) => {
