@@ -47,6 +47,14 @@ jobs:
         run: npm run typecheck && npm run lint
       - name: Tests (coverage + thresholds)
         run: npm run test:ci
+      - name: Build and generate OpenAPI spec
+        run: npm run build && node scripts/generate-openapi.mjs
+      - name: Upload OpenAPI spec
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: openapi.json
+          if-no-files-found: error
 
   secret-scan:
     name: Secret scanning (PR diff)
