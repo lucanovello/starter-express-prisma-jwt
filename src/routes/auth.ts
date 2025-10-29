@@ -9,6 +9,7 @@ import {
   VerifyEmailSchema,
 } from "../dto/auth.js";
 import { AppError } from "../lib/errors.js";
+import { requireAuth } from "../middleware/requireAuth.js";
 import * as Auth from "../services/authService.js";
 
 export const auth = Router();
@@ -112,10 +113,13 @@ auth.post("/reset-password", async (req, res, next) => {
 });
 
 // List sessions
-auth.get("/sessions", async (req, res, next) => {
+auth.get("/sessions", requireAuth, async (req, res, next) => {
   try {
-    const { userId, sessionId } = requireAccessToken(req);
-    const sessions = await Auth.listSessions(userId, sessionId);
+    const { id: userId, sessionId } = req.user ?? {};
+    if (!userId) {
+      throw new AppError("Unauthorized", 401, { code: "UNAUTHORIZED" });
+    }
+    const sessions = await Auth.listSessions(userId, sessionId ?? null);
     res.status(200).json({ sessions, count: sessions.length });
   } catch (err) {
     next(err);
@@ -123,9 +127,12 @@ auth.get("/sessions", async (req, res, next) => {
 });
 
 // Logout all sessions
-auth.post("/logout-all", async (req, res, next) => {
+auth.post("/logout-all", requireAuth, async (req, res, next) => {
   try {
-    const { userId } = requireAccessToken(req);
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError("Unauthorized", 401, { code: "UNAUTHORIZED" });
+    }
     await Auth.logoutAll(userId);
     res.status(204).end();
   } catch (err) {

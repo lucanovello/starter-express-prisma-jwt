@@ -10,7 +10,8 @@ generator client {
 model User {
   id        String    @id @default(uuid())
   email     String    @unique
-  password  String   
+  password  String
+  role      Role      @default(USER)
   sessions  Session[]
   emailVerifiedAt DateTime?
   verificationTokens VerificationToken[]
@@ -73,4 +74,9 @@ model LoginAttempt {
 
   @@unique([emailLowercase, ipAddress])
   @@index([lockedUntil])
+}
+
+enum Role {
+  USER
+  ADMIN
 }
