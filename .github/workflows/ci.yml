@@ -58,10 +58,9 @@ jobs:
           fetch-depth: 0
       - name: Gitleaks diff scan
         uses: gitleaks/gitleaks-action@v2
-        with:
-          args: >-
-            detect --source . --no-banner --redact --exit-code 1
-            --log-opts ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.24.3"
 
   infra-lint:
     name: Infrastructure lint
