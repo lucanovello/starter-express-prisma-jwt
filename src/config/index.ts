@@ -7,6 +7,9 @@ const splitCommaSeparated = (value: string | undefined): string[] =>
     .map((part) => part.trim())
     .filter(Boolean);
 
+const parseBooleanEnv = (value: string | undefined): boolean =>
+  value != null && value.trim().toLowerCase() === "true";
+
 const validateCidr = (cidr: string): boolean => {
   try {
     ipaddr.parseCIDR(cidr);
@@ -107,6 +110,15 @@ const EnvSchema = z.object({
   }
 
   if (data.NODE_ENV === "production") {
+    const metricsEnabled = parseBooleanEnv(data.METRICS_ENABLED);
+    if (metricsEnabled && data.METRICS_GUARD === "none") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["METRICS_GUARD"],
+        message: "METRICS_GUARD must be secret or cidr when METRICS_ENABLED=true in production",
+      });
+    }
+
     const allowlist = splitCommaSeparated(data.CORS_ORIGINS);
     if (allowlist.length === 0) {
       ctx.addIssue({
@@ -134,6 +146,7 @@ export class ConfigError extends Error {
 
 export type AppConfig = z.infer<typeof EnvSchema> & {
   corsOriginsParsed: string[];
+  metricsEnabled: boolean;
   metricsGuard: MetricsGuardConfig;
   rateLimitStore: RateLimitStoreConfig;
   auth: {
@@ -165,6 +178,7 @@ export function getConfig(): AppConfig {
   }
   const cfg = parsed.data;
   const corsOriginsParsed = splitCommaSeparated(cfg.CORS_ORIGINS);
+  const metricsEnabled = parseBooleanEnv(cfg.METRICS_ENABLED);
   const metricsGuard: MetricsGuardConfig =
     cfg.METRICS_GUARD === "secret"
       ? { type: "secret", secret: cfg.METRICS_GUARD_SECRET!.trim() }
@@ -189,7 +203,14 @@ export function getConfig(): AppConfig {
     loginAttemptWindowMs: cfg.AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES * 60 * 1000,
   };
 
-  cached = { ...cfg, corsOriginsParsed, metricsGuard, rateLimitStore, auth };
+  cached = {
+    ...cfg,
+    corsOriginsParsed,
+    metricsEnabled,
+    metricsGuard,
+    rateLimitStore,
+    auth,
+  };
   return cached!;
 }
 

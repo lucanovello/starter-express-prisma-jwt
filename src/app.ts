@@ -15,7 +15,7 @@ import pinoHttp, { type Options } from "pino-http";
 import swaggerUi from "swagger-ui-express";
 
 import { BUILD_VERSION, BUILD_GIT_SHA, BUILD_TIME } from "./build/meta.js";
-import { getConfig, type MetricsGuardConfig } from "./config/index.js";
+import { getConfig, type AppConfig, type MetricsGuardConfig } from "./config/index.js";
 import openapi from "./docs/openapi.js";
 import { prisma } from "./lib/prisma.js";
 import { isShuttingDown } from "./lifecycle/state.js";
@@ -31,9 +31,29 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 const app = express();
 
+type NodeEnv = AppConfig["NODE_ENV"];
+
 const METRICS_SECRET_HEADER = "x-metrics-secret";
 
-const createMetricsGuard = (guard: MetricsGuardConfig): RequestHandler[] => {
+const createMetricsGuard = (env: NodeEnv, guard: MetricsGuardConfig): RequestHandler[] => {
+  const respondForbidden = (res: Response) =>
+    res.status(403).json({
+      error: {
+        message: "Metrics access forbidden",
+        code: "METRICS_GUARD_FORBIDDEN",
+      },
+    });
+
+  if (guard.type === "none") {
+    if (env === "production") {
+      const blockUnguarded: RequestHandler = (_req, res) => {
+        respondForbidden(res);
+      };
+      return [blockUnguarded];
+    }
+    return [];
+  }
+
   if (guard.type === "secret") {
     const expected = guard.secret;
     const requireSecret: RequestHandler = (req, res, next) => {
@@ -55,12 +75,8 @@ const createMetricsGuard = (guard: MetricsGuardConfig): RequestHandler[] => {
     const requireAllowlist: RequestHandler = (req, res, next) => {
       const ip = normalizeClientIp(req);
       if (!ip || !isIpAllowed(ip, guard.allowlist)) {
-        return res.status(403).json({
-          error: {
-            message: "Metrics access forbidden",
-            code: "METRICS_GUARD_FORBIDDEN",
-          },
-        });
+        respondForbidden(res);
+        return;
       }
       return next();
     };
@@ -120,6 +136,7 @@ const cfg = getConfig();
 const redactionPaths = [
   "req.headers.authorization",
   "req.headers.cookie",
+  'req.headers["x-metrics-secret"]',
   "req.headers['set-cookie']",
   "res.headers['set-cookie']",
   "req.body.password",
@@ -188,8 +205,8 @@ await registerSecurity(app);
 
 // Metrics: request logging + /metrics endpoint
 app.use(metricsMiddleware);
-if (cfg.NODE_ENV !== "production" || cfg.METRICS_ENABLED === "true") {
-  const guardChain = createMetricsGuard(cfg.metricsGuard);
+if (cfg.NODE_ENV !== "production" || cfg.metricsEnabled) {
+  const guardChain = createMetricsGuard(cfg.NODE_ENV, cfg.metricsGuard);
   app.get("/metrics", ...guardChain, metricsHandler as RequestHandler);
 }
 
