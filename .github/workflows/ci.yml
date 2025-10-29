@@ -39,9 +39,40 @@ jobs:
           node-version: 20.19.0
           cache: npm
       - run: npm ci
+      - name: Dependency vulnerability audit
+        run: npm run audit:ci
       - name: Prisma migrate & generate
         run: npx prisma migrate deploy && npx prisma generate
       - name: Static checks (types + lint)
         run: npm run typecheck && npm run lint
       - name: Tests (coverage + thresholds)
         run: npm run test:ci
+
+  secret-scan:
+    name: Secret scanning (PR diff)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks diff scan
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: >-
+            detect --source . --no-banner --redact --exit-code 1
+            --log-opts ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+
+  infra-lint:
+    name: Infrastructure lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+      - name: Lint GitHub workflows with actionlint
+        uses: docker://rhysd/actionlint:1.7.6
+        with:
+          args: "-color"
