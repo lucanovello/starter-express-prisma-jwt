@@ -142,3 +142,4 @@ vite.config.ts.timestamp-*
 # Generated files
 /src/generated/
 /src/build/meta.ts
+/openapi.json

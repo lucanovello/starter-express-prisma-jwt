@@ -252,7 +252,8 @@ app.use("/protected", protectedRoutes);
 app.get("/openapi.json", (_req, res) => res.json(openapi));
 
 // Serve Swagger UI only in non-production environments
-if (process.env.NODE_ENV !== "production") {
+const shouldExposeDocs = cfg.NODE_ENV !== "production";
+if (shouldExposeDocs) {
   app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapi));
 }
 
