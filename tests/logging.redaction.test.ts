@@ -36,6 +36,7 @@ describe("log redaction", () => {
           authorization: "Bearer secret-token",
           cookie: "session=secret",
           "set-cookie": "session=secret",
+          "x-metrics-secret": "metrics-secret",
         },
         body: {
           password: "hunter2",
@@ -57,5 +58,7 @@ describe("log redaction", () => {
     expect(output).not.toContain("session=secret");
     expect(output).not.toContain("hunter2");
     expect(output).not.toContain("oauth-secret");
+    const parsed = JSON.parse(chunks[0]!);
+    expect(parsed.req.headers["x-metrics-secret"]).toBe("[REDACTED]");
   });
 });
