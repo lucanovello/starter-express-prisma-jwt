@@ -47,6 +47,10 @@ npm run test:cov  # uploads lcov artifact in CI
 | PORT                                | 3000                                                 | optional                                                          |
 | CORS_ORIGINS                        | https://app.example.com                              | comma-separated allowlist, required in production                 |
 | RATE_LIMIT_REDIS_URL                | redis://cache:6379                                   | required in production                                            |
+| METRICS_ENABLED                     | false                                                | Enable Prometheus `/metrics`; defaults off in production          |
+| METRICS_GUARD                       | secret                                               | Use `secret` (shared header) or `cidr` (IP allowlist) in prod     |
+| METRICS_GUARD_SECRET                | prod-metrics-secret                                  | Required when `METRICS_GUARD=secret`; clients send `x-metrics-secret` |
+| METRICS_GUARD_ALLOWLIST            | 203.0.113.0/24                                       | Comma-separated CIDRs when `METRICS_GUARD=cidr`                   |
 | AUTH_EMAIL_VERIFICATION_REQUIRED    | false                                                | defaults to false; when true, new sign-ins require verified email |
 | AUTH_EMAIL_VERIFICATION_TTL_MINUTES | 60                                                   | TTL for verification tokens (minutes)                             |
 | AUTH_PASSWORD_RESET_TTL_MINUTES     | 30                                                   | TTL for password reset tokens (minutes)                           |
@@ -67,6 +71,10 @@ npm run test:cov  # uploads lcov artifact in CI
 | PORT                                | 3000                                                 | optional                                                          |
 | CORS_ORIGINS                        | https://app.example.com                              | comma-separated allowlist, required in production                 |
 | RATE_LIMIT_REDIS_URL                | redis://cache:6379                                   | required in production                                            |
+| METRICS_ENABLED                     | false                                                | Enable Prometheus `/metrics`; defaults off in production          |
+| METRICS_GUARD                       | secret                                               | Use `secret` (shared header) or `cidr` (IP allowlist) in prod     |
+| METRICS_GUARD_SECRET                | prod-metrics-secret                                  | Required when `METRICS_GUARD=secret`; clients send `x-metrics-secret` |
+| METRICS_GUARD_ALLOWLIST            | 203.0.113.0/24                                       | Comma-separated CIDRs when `METRICS_GUARD=cidr`                   |
 | AUTH_EMAIL_VERIFICATION_REQUIRED    | false                                                | defaults to false; when true, new sign-ins require verified email |
 | AUTH_EMAIL_VERIFICATION_TTL_MINUTES | 60                                                   | TTL for verification tokens (minutes)                             |
 | AUTH_PASSWORD_RESET_TTL_MINUTES     | 30                                                   | TTL for password reset tokens (minutes)                           |
@@ -98,8 +106,14 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 
 ## Observability
 
-- Prometheus: `GET /metrics` (non-production by default; enable in prod via `METRICS_ENABLED=true`)
+- Prometheus: `GET /metrics` (non-production by default; enable in prod via `METRICS_ENABLED=true`). In production, choose either `METRICS_GUARD=secret` with a shared `x-metrics-secret` header or `METRICS_GUARD=cidr` with `METRICS_GUARD_ALLOWLIST`. Unauthorized requests return `401`/`403` without exposing metrics.
 - Common series: `http_requests_total`, `http_request_duration_seconds`, Node process metrics.
+- Version: `GET /version` returns `{ version, gitSha, buildTime }` from the build stamp.
+
+## Logging
+
+- Structured Pino logs include a per-request `x-request-id`.
+- Sensitive headers and payload fields (`authorization`, `cookie`, `x-metrics-secret`, password/token fields, etc.) are redacted to `[REDACTED]`. Extend via `LOG_REDACTION_PATHS` if you add new secrets.
 
 ## Rate limiting + timeouts
 
