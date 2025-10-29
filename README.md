@@ -23,18 +23,37 @@ npm run dev
 # GET http://localhost:3000/health -> {"status":"ok"}
 ```
 
+## Environment matrix
+
+| Environment               | Entry point                                                                   | Backing services                                             | Notes                                                                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Local development         | `npm run dev` after `docker compose up -d db`                                 | Postgres 15 via `docker-compose.yml`                         | `.env` (copy from `.env.example`) with relaxed defaults; runs in watch mode.                                            |
+| Continuous integration    | `.github/workflows/ci.yml`                                                    | Postgres 15 service container                                | Workflow runs `npm run typecheck && npm run lint && npm run test:ci` plus OpenAPI build; uses `.env.test`.              |
+| Production docker compose | `docker compose --env-file .env.production -f compose.prod.yml up -d --build` | App, Postgres, Redis with health checks and ordered start-up | Requires strong JWT secrets, explicit `CORS_ORIGINS`, `RATE_LIMIT_REDIS_URL`, and enables readiness probe via `/ready`. |
+
+### Production compose highlights
+
+- `compose.prod.yml` builds the `runner` stage from `Dockerfile`, then starts Postgres and Redis with health checks before the API.
+- The API container keeps `npx prisma migrate deploy` as its entrypoint before `node dist/index.js`.
+- Redis is mandatory in production to back rate limiting (`RATE_LIMIT_REDIS_URL`); the container exits unhealthy if Redis fails.
+- Pass a hardened env file (e.g. `.env.production`) via `--env-file` or inject secrets through your orchestrator; `.env` remains git-ignored.
+- Keep `METRICS_ENABLED=false` unless you have a guarded Prometheus scraper; when enabling, also set `METRICS_GUARD` + secret/allowlist.
+
+Operational runbooks live in `docs/ops/runbook.md`. Kubernetes starter manifests are available in `docs/ops/kubernetes` if you prefer deploying outside Docker Compose.
+
 ## Test
 
 ```bash
 npm test
 npm run test:cov  # uploads lcov artifact in CI
 ```
+
 ## API docs & clients
 
 - OpenAPI is served at `GET /openapi.json` and Swagger UI is available at `/docs` in non-production environments only.
 - Regenerate the JSON locally with `npm run build && node scripts/generate-openapi.mjs`; the file is written to `./openapi.json` for sharing or client generation.
 - CI publishes the `openapi.json` artifact on every successful run so releases can attach the spec without rebuilding.
-- Postman: **File -> Import -> File**, choose `openapi.json`, then pick *Generate collection*.
+- Postman: **File -> Import -> File**, choose `openapi.json`, then pick _Generate collection_.
 - Insomnia: **Application -> Preferences -> Data -> Import Data -> From File**, select `openapi.json` and import as a new workspace.
 
 ## Health
@@ -44,54 +63,54 @@ npm run test:cov  # uploads lcov artifact in CI
 
 ## Env
 
-| Name                                | Example                                              | Notes                                                             |
-| ----------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------- |
-| DATABASE_URL                        | postgres://user:pass@host:5432/starter?schema=public | Postgres DSN                                                      |
-| JWT_ACCESS_SECRET                   | dev-access                                           | required                                                          |
-| JWT_REFRESH_SECRET                  | dev-refresh                                          | required                                                          |
-| JWT_ACCESS_EXPIRY                   | 15m                                                  | default 15m                                                       |
-| JWT_REFRESH_EXPIRY                  | 7d                                                   | default 7d                                                        |
-| PORT                                | 3000                                                 | optional                                                          |
-| CORS_ORIGINS                        | https://app.example.com                              | comma-separated allowlist, required in production                 |
-| RATE_LIMIT_REDIS_URL                | redis://cache:6379                                   | required in production                                            |
-| METRICS_ENABLED                     | false                                                | Enable Prometheus `/metrics`; defaults off in production          |
-| METRICS_GUARD                       | secret                                               | Use `secret` (shared header) or `cidr` (IP allowlist) in prod     |
+| Name                                | Example                                              | Notes                                                                 |
+| ----------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
+| DATABASE_URL                        | postgres://user:pass@host:5432/starter?schema=public | Postgres DSN                                                          |
+| JWT_ACCESS_SECRET                   | dev-access                                           | required                                                              |
+| JWT_REFRESH_SECRET                  | dev-refresh                                          | required                                                              |
+| JWT_ACCESS_EXPIRY                   | 15m                                                  | default 15m                                                           |
+| JWT_REFRESH_EXPIRY                  | 7d                                                   | default 7d                                                            |
+| PORT                                | 3000                                                 | optional                                                              |
+| CORS_ORIGINS                        | https://app.example.com                              | comma-separated allowlist, required in production                     |
+| RATE_LIMIT_REDIS_URL                | redis://cache:6379                                   | required in production                                                |
+| METRICS_ENABLED                     | false                                                | Enable Prometheus `/metrics`; defaults off in production              |
+| METRICS_GUARD                       | secret                                               | Use `secret` (shared header) or `cidr` (IP allowlist) in prod         |
 | METRICS_GUARD_SECRET                | prod-metrics-secret                                  | Required when `METRICS_GUARD=secret`; clients send `x-metrics-secret` |
-| METRICS_GUARD_ALLOWLIST            | 203.0.113.0/24                                       | Comma-separated CIDRs when `METRICS_GUARD=cidr`                   |
-| AUTH_EMAIL_VERIFICATION_REQUIRED    | false                                                | defaults to false; when true, new sign-ins require verified email |
-| AUTH_EMAIL_VERIFICATION_TTL_MINUTES | 60                                                   | TTL for verification tokens (minutes)                             |
-| AUTH_PASSWORD_RESET_TTL_MINUTES     | 30                                                   | TTL for password reset tokens (minutes)                           |
-| AUTH_LOGIN_MAX_ATTEMPTS             | 5                                                    | Maximum failed logins per IP/email before lockout                 |
-| AUTH_LOGIN_LOCKOUT_MINUTES          | 15                                                   | Lockout duration (minutes)                                        |
-| AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES   | 15                                                   | Rolling window for counting login attempts (minutes)              |
-| REQUEST_BODY_LIMIT                  | 100kb                                                | optional override for express.json()                              |
-| HTTP_SERVER_REQUEST_TIMEOUT_MS      | 30000                                                | optional override, default 30s                                    |
-| HTTP_SERVER_HEADERS_TIMEOUT_MS      | 60000                                                | optional override, default 60s                                    |
-| HTTP_SERVER_KEEPALIVE_TIMEOUT_MS    | 5000                                                 | optional override, default 5s                                     |
-| Name                                | Example                                              | Notes                                                             |
-| ----------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------- |
-| DATABASE_URL                        | postgres://user:pass@host:5432/starter?schema=public | Postgres DSN                                                      |
-| JWT_ACCESS_SECRET                   | dev-access                                           | required                                                          |
-| JWT_REFRESH_SECRET                  | dev-refresh                                          | required                                                          |
-| JWT_ACCESS_EXPIRY                   | 15m                                                  | default 15m                                                       |
-| JWT_REFRESH_EXPIRY                  | 7d                                                   | default 7d                                                        |
-| PORT                                | 3000                                                 | optional                                                          |
-| CORS_ORIGINS                        | https://app.example.com                              | comma-separated allowlist, required in production                 |
-| RATE_LIMIT_REDIS_URL                | redis://cache:6379                                   | required in production                                            |
-| METRICS_ENABLED                     | false                                                | Enable Prometheus `/metrics`; defaults off in production          |
-| METRICS_GUARD                       | secret                                               | Use `secret` (shared header) or `cidr` (IP allowlist) in prod     |
+| METRICS_GUARD_ALLOWLIST             | 203.0.113.0/24                                       | Comma-separated CIDRs when `METRICS_GUARD=cidr`                       |
+| AUTH_EMAIL_VERIFICATION_REQUIRED    | false                                                | defaults to false; when true, new sign-ins require verified email     |
+| AUTH_EMAIL_VERIFICATION_TTL_MINUTES | 60                                                   | TTL for verification tokens (minutes)                                 |
+| AUTH_PASSWORD_RESET_TTL_MINUTES     | 30                                                   | TTL for password reset tokens (minutes)                               |
+| AUTH_LOGIN_MAX_ATTEMPTS             | 5                                                    | Maximum failed logins per IP/email before lockout                     |
+| AUTH_LOGIN_LOCKOUT_MINUTES          | 15                                                   | Lockout duration (minutes)                                            |
+| AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES   | 15                                                   | Rolling window for counting login attempts (minutes)                  |
+| REQUEST_BODY_LIMIT                  | 100kb                                                | optional override for express.json()                                  |
+| HTTP_SERVER_REQUEST_TIMEOUT_MS      | 30000                                                | optional override, default 30s                                        |
+| HTTP_SERVER_HEADERS_TIMEOUT_MS      | 60000                                                | optional override, default 60s                                        |
+| HTTP_SERVER_KEEPALIVE_TIMEOUT_MS    | 5000                                                 | optional override, default 5s                                         |
+| Name                                | Example                                              | Notes                                                                 |
+| ----------------------------------- | ---------------------------------------------------- | -----------------------------------------------------------------     |
+| DATABASE_URL                        | postgres://user:pass@host:5432/starter?schema=public | Postgres DSN                                                          |
+| JWT_ACCESS_SECRET                   | dev-access                                           | required                                                              |
+| JWT_REFRESH_SECRET                  | dev-refresh                                          | required                                                              |
+| JWT_ACCESS_EXPIRY                   | 15m                                                  | default 15m                                                           |
+| JWT_REFRESH_EXPIRY                  | 7d                                                   | default 7d                                                            |
+| PORT                                | 3000                                                 | optional                                                              |
+| CORS_ORIGINS                        | https://app.example.com                              | comma-separated allowlist, required in production                     |
+| RATE_LIMIT_REDIS_URL                | redis://cache:6379                                   | required in production                                                |
+| METRICS_ENABLED                     | false                                                | Enable Prometheus `/metrics`; defaults off in production              |
+| METRICS_GUARD                       | secret                                               | Use `secret` (shared header) or `cidr` (IP allowlist) in prod         |
 | METRICS_GUARD_SECRET                | prod-metrics-secret                                  | Required when `METRICS_GUARD=secret`; clients send `x-metrics-secret` |
-| METRICS_GUARD_ALLOWLIST            | 203.0.113.0/24                                       | Comma-separated CIDRs when `METRICS_GUARD=cidr`                   |
-| AUTH_EMAIL_VERIFICATION_REQUIRED    | false                                                | defaults to false; when true, new sign-ins require verified email |
-| AUTH_EMAIL_VERIFICATION_TTL_MINUTES | 60                                                   | TTL for verification tokens (minutes)                             |
-| AUTH_PASSWORD_RESET_TTL_MINUTES     | 30                                                   | TTL for password reset tokens (minutes)                           |
-| AUTH_LOGIN_MAX_ATTEMPTS             | 5                                                    | Maximum failed logins per IP/email before lockout                 |
-| AUTH_LOGIN_LOCKOUT_MINUTES          | 15                                                   | Lockout duration (minutes)                                        |
-| AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES   | 15                                                   | Rolling window for counting login attempts (minutes)              |
-| REQUEST_BODY_LIMIT                  | 100kb                                                | optional override for express.json()                              |
-| HTTP_SERVER_REQUEST_TIMEOUT_MS      | 30000                                                | optional override, default 30s                                    |
-| HTTP_SERVER_HEADERS_TIMEOUT_MS      | 60000                                                | optional override, default 60s                                    |
-| HTTP_SERVER_KEEPALIVE_TIMEOUT_MS    | 5000                                                 | optional override, default 5s                                     |
+| METRICS_GUARD_ALLOWLIST             | 203.0.113.0/24                                       | Comma-separated CIDRs when `METRICS_GUARD=cidr`                       |
+| AUTH_EMAIL_VERIFICATION_REQUIRED    | false                                                | defaults to false; when true, new sign-ins require verified email     |
+| AUTH_EMAIL_VERIFICATION_TTL_MINUTES | 60                                                   | TTL for verification tokens (minutes)                                 |
+| AUTH_PASSWORD_RESET_TTL_MINUTES     | 30                                                   | TTL for password reset tokens (minutes)                               |
+| AUTH_LOGIN_MAX_ATTEMPTS             | 5                                                    | Maximum failed logins per IP/email before lockout                     |
+| AUTH_LOGIN_LOCKOUT_MINUTES          | 15                                                   | Lockout duration (minutes)                                            |
+| AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES   | 15                                                   | Rolling window for counting login attempts (minutes)                  |
+| REQUEST_BODY_LIMIT                  | 100kb                                                | optional override for express.json()                                  |
+| HTTP_SERVER_REQUEST_TIMEOUT_MS      | 30000                                                | optional override, default 30s                                        |
+| HTTP_SERVER_HEADERS_TIMEOUT_MS      | 60000                                                | optional override, default 60s                                        |
+| HTTP_SERVER_KEEPALIVE_TIMEOUT_MS    | 5000                                                 | optional override, default 5s                                         |
 
 ## Run in Docker (prod-like)
 
@@ -143,9 +162,8 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 - Deploy behind a TLS-terminating reverse proxy or CDN that enforces HSTS and handles TLS certificates.
 - Ensure the proxy forwards `x-forwarded-*` headers and configure `trust proxy` if you terminate TLS upstream.
 - Apply additional security headers (e.g. HSTS, CSP) at the edge where you control cache and domain policy.
+
 ## Version
 
 - `GET /version` -> `{ version, gitSha, buildTime }`
 - Versioning policy: routes are treated as **v1** today. Mount behind `/v1` at the gateway and reserve new `/v{n}` prefixes for breaking changes.
-
-
