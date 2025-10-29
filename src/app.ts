@@ -25,6 +25,7 @@ import { attachUserToLog } from "./middleware/logUser.js";
 import { notFound } from "./middleware/notFound.js";
 import { registerSecurity } from "./middleware/security.js";
 import { auth as authRoutes } from "./routes/auth.js";
+import { protectedRoutes } from "./routes/protected.js";
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 
@@ -227,6 +228,7 @@ app.get("/version", (_req: Request, res: Response) => {
 
 // Feature routes
 app.use("/auth", authRoutes);
+app.use("/protected", protectedRoutes);
 
 // API docs
 // Serve OpenAPI spec as JSON
