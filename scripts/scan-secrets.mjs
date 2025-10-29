@@ -61,7 +61,7 @@ if (hasBinary(dockerBinary)) {
     `${workspace}:/repo`,
     "-w",
     "/repo",
-    "zricethezav/gitleaks:8",
+    "zricethezav/gitleaks:v8.24.3",
     ...finalArgs.map((arg) => (arg === "." ? "/repo" : arg)),
   ];
 
