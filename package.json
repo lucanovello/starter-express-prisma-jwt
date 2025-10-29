@@ -9,6 +9,7 @@
     "postinstall": "prisma generate",
     "pretest": "node scripts/stamp-build-meta.mjs",
     "test": "cross-env TEST_ENV_FILE=.env.test vitest run",
+    "audit:ci": "audit-ci --moderate",
     "pretest:cov": "node scripts/stamp-build-meta.mjs",
     "test:cov": "cross-env TEST_ENV_FILE=.env.test vitest run --coverage",
     "prebuild": "node scripts/stamp-build-meta.mjs",
@@ -22,7 +23,8 @@
     "lint": "eslint . --max-warnings=0",
     "pretest:ci": "node scripts/stamp-build-meta.mjs",
     "test:ci": "cross-env TEST_ENV_FILE=.env.test vitest run --coverage",
-    "check": "npm run typecheck && npm run lint && npm run test:ci"
+    "check": "npm run typecheck && npm run lint && npm run test:ci",
+    "secrets:scan": "node scripts/scan-secrets.mjs"
   },
   "engines": {
     "node": ">=20.19 <21"
@@ -85,6 +87,7 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "audit-ci": "^7.1.0"
   }
 }
