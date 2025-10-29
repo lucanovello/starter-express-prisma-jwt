@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: starter-api-config
+  namespace: replace-me
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  CORS_ORIGINS: "https://app.example.com"
+  METRICS_ENABLED: "false"
+  METRICS_GUARD: "secret"
+  AUTH_EMAIL_VERIFICATION_REQUIRED: "true"
+  AUTH_LOGIN_MAX_ATTEMPTS: "5"
+  AUTH_LOGIN_LOCKOUT_MINUTES: "15"
+  AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES: "15"
