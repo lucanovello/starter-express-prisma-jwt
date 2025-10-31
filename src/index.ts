@@ -14,7 +14,7 @@ async function main() {
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
   // Lazy-load app so config validation errors thrown during module init are catchable here.
-  const { default: app } = await import("./app.js");
+  const { default: app, disposeSecurity } = await import("./app.js");
   const { scheduleSessionCleanup } = await import("./jobs/sessionCleanup.js");
 
   const server = app.listen(port, () => {
@@ -33,6 +33,12 @@ async function main() {
     stopSessionCleanup();
 
     const cleanup = async () => {
+      try {
+        await disposeSecurity();
+      } catch (e) {
+        logger.error({ err: e }, "Rate limiter disconnect error");
+      }
+
       try {
         await prisma.$disconnect();
         logger.info("Database disconnected successfully");
