@@ -53,6 +53,7 @@ const prepareBaseEnv = () => {
   process.env.METRICS_ENABLED = "true";
   process.env.CORS_ORIGINS = "https://app.example.com";
   process.env.RATE_LIMIT_REDIS_URL = "redis://fake-host:6379";
+  process.env.TRUST_PROXY = "loopback";
   process.env.JWT_ACCESS_SECRET = "prod-access-secret-0123456789abcdef";
   process.env.JWT_REFRESH_SECRET = "prod-refresh-secret-fedcba9876543210";
   process.env.JWT_ACCESS_EXPIRY = "15m";
@@ -71,9 +72,7 @@ const setupProductionApp = async (configureMetrics: () => void) => {
   const { resetConfigCache } = await import("../src/config/index.js");
   resetConfigCache();
   const mod = await import("../src/app.js");
-  const app = mod.default;
-  app.set("trust proxy", "loopback");
-  return app;
+  return mod.default;
 };
 
 describe("metrics guard in production", () => {
@@ -93,24 +92,19 @@ describe("metrics guard in production", () => {
     const missing = await request(app).get("/metrics").expect(401);
     expect(missing.body?.error?.code).toBe("METRICS_GUARD_MISSING");
 
-    await request(app)
-      .get("/metrics")
-      .set(METRICS_SECRET_HEADER, "prod-guard-secret")
-      .expect(200);
+    await request(app).get("/metrics").set(METRICS_SECRET_HEADER, "prod-guard-secret").expect(200);
   });
 
   test("enforces CIDR allowlist", async () => {
     const app = await setupProductionApp(() => {
       process.env.METRICS_GUARD = "cidr";
       process.env.METRICS_GUARD_ALLOWLIST = "203.0.113.0/24";
+      process.env.TRUST_PROXY = "1";
     });
 
     const blocked = await request(app).get("/metrics").expect(403);
     expect(blocked.body?.error?.code).toBe("METRICS_GUARD_FORBIDDEN");
 
-    await request(app)
-      .get("/metrics")
-      .set("x-forwarded-for", "203.0.113.22")
-      .expect(200);
+    await request(app).get("/metrics").set("x-forwarded-for", "203.0.113.22").expect(200);
   });
 });

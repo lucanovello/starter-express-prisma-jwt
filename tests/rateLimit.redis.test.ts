@@ -10,11 +10,11 @@ const RATE_ENV_VARS = [
   "RATE_LIMIT_RPM",
   "RATE_LIMIT_RPM_AUTH",
   "RATE_LIMIT_WINDOW_SEC",
+  "TRUST_PROXY",
 ];
 
 const originalEnv: Record<string, string | undefined> = {};
 const originalNodeEnv = process.env.NODE_ENV;
-
 
 beforeAll(() => {
   for (const key of RATE_ENV_VARS) {
@@ -184,6 +184,27 @@ test("redis-backed rate limiting persists counters between requests", async () =
   expect(blocked.status).toBe(429);
 });
 
+test("rate limiter honours x-forwarded-for when trusting proxies", async () => {
+  process.env.NODE_ENV = "development";
+  process.env.TRUST_PROXY = "1";
+  process.env.RATE_LIMIT_RPM = "2";
+  process.env.RATE_LIMIT_WINDOW_SEC = "60";
+  process.env.JWT_ACCESS_SECRET = "0123456789abcdef0123456789abcdef";
+  process.env.JWT_REFRESH_SECRET = "fedcba9876543210fedcba9876543210";
+  process.env.JWT_ACCESS_EXPIRY = "15m";
+  process.env.JWT_REFRESH_EXPIRY = "7d";
+
+  const mod = await import("../src/app.js");
+  const app = mod.default;
+
+  const agent = request(app);
+  await agent.get("/health").set("x-forwarded-for", "198.51.100.20").expect(200);
+  await agent.get("/health").set("x-forwarded-for", "198.51.100.20").expect(200);
+  const blocked = await agent.get("/health").set("x-forwarded-for", "198.51.100.20");
+
+  expect(blocked.status).toBe(429);
+});
+
 test("application fails fast when the redis store is unreachable", async () => {
   vi.doMock("rate-limit-redis", () => {
     class MinimalStore {
@@ -209,4 +230,3 @@ test("application fails fast when the redis store is unreachable", async () => {
 
   await expect(import("../src/app.js")).rejects.toThrow(/rate limit store/i);
 });
-
