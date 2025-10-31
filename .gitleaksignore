@@ -1,6 +1,8 @@
 # Gitleaks ignore file
+
 # Only ignoring test fixtures that are clearly not real secrets
 
 # Test fixture values in tests/jwt.config.test.ts (patterns like "0123456789abcdef...")
+
 359afb5d113d6e99cdb2dc9d218ec472b5258e77:tests/jwt.config.test.ts:generic-api-key:11
 359afb5d113d6e99cdb2dc9d218ec472b5258e77:tests/jwt.config.test.ts:generic-api-key:12
