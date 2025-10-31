@@ -1,6 +1,7 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
 import { getConfig } from "../config/index.js";
+import { getLogger } from "../lib/logger.js";
 
 export interface EmailService {
   sendVerificationEmail(to: string, token: string): Promise<void>;
@@ -8,30 +9,47 @@ export interface EmailService {
 }
 
 class ConsoleEmailService implements EmailService {
+  private logger = getLogger();
+
   async sendVerificationEmail(to: string, token: string): Promise<void> {
-    console.log("\n=== EMAIL: Verification ===");
-    console.log(`To: ${to}`);
-    console.log(`Subject: Verify your email address`);
-    console.log(`\nVerification token: ${token}`);
-    console.log(`\nIn production, this would be a link like:`);
-    console.log(`https://yourapp.com/verify-email?token=${token}`);
-    console.log("===========================\n");
+    this.logger.info(
+      {
+        emailType: "verification",
+        recipient: to,
+        tokenLength: token.length,
+      },
+      "Email (console): Verification email",
+    );
+    this.logger.info(
+      {
+        exampleLink: `https://yourapp.com/verify-email?token=${token}`,
+      },
+      "Verification token ready",
+    );
   }
 
   async sendPasswordResetEmail(to: string, token: string): Promise<void> {
-    console.log("\n=== EMAIL: Password Reset ===");
-    console.log(`To: ${to}`);
-    console.log(`Subject: Reset your password`);
-    console.log(`\nReset token: ${token}`);
-    console.log(`\nIn production, this would be a link like:`);
-    console.log(`https://yourapp.com/reset-password?token=${token}`);
-    console.log("==============================\n");
+    this.logger.info(
+      {
+        emailType: "password-reset",
+        recipient: to,
+        tokenLength: token.length,
+      },
+      "Email (console): Password reset email",
+    );
+    this.logger.info(
+      {
+        exampleLink: `https://yourapp.com/reset-password?token=${token}`,
+      },
+      "Password reset token ready",
+    );
   }
 }
 
 class SmtpEmailService implements EmailService {
   private transporter: Transporter;
   private fromAddress: string;
+  private logger = getLogger();
 
   constructor(transporter: Transporter, fromAddress: string) {
     this.transporter = transporter;
@@ -88,13 +106,22 @@ This verification code will expire in 1 hour.
 If you didn't create an account, you can safely ignore this email.
     `.trim();
 
-    await this.transporter.sendMail({
+    const info = await this.transporter.sendMail({
       from: this.fromAddress,
       to,
       subject,
       text,
       html,
     });
+
+    this.logger.info(
+      {
+        emailType: "verification",
+        recipient: to,
+        messageId: info.messageId,
+      },
+      "Verification email sent via SMTP",
+    );
   }
 
   async sendPasswordResetEmail(to: string, token: string): Promise<void> {
@@ -147,13 +174,22 @@ This reset code will expire in 30 minutes.
 If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.
     `.trim();
 
-    await this.transporter.sendMail({
+    const info = await this.transporter.sendMail({
       from: this.fromAddress,
       to,
       subject,
       text,
       html,
     });
+
+    this.logger.info(
+      {
+        emailType: "password-reset",
+        recipient: to,
+        messageId: info.messageId,
+      },
+      "Password reset email sent via SMTP",
+    );
   }
 }
 

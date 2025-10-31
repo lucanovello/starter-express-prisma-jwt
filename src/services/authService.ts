@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { getConfig } from "../config/index.js";
 import { AppError } from "../lib/errors.js";
 import { decodeRefresh, signAccess, signRefresh, verifyAccess, verifyRefresh } from "../lib/jwt.js";
+import { getLogger } from "../lib/logger.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken, tokenEqualsHash } from "../lib/tokenHash.js";
@@ -290,9 +291,10 @@ export async function register(input: {
     // Send verification email after successful transaction
     if (result.emailVerificationRequired && result.verificationToken) {
       const emailService = getEmailService();
+      const logger = getLogger();
       // Fire and forget - don't block the response
       emailService.sendVerificationEmail(result.email, result.verificationToken).catch((err) => {
-        console.error("Failed to send verification email:", err);
+        logger.error({ err, recipient: result.email }, "Failed to send verification email");
       });
     }
 
@@ -484,8 +486,12 @@ export async function requestPasswordReset(email: string): Promise<{ token?: str
 
   // Send password reset email - fire and forget
   const emailService = getEmailService();
+  const logger = getLogger();
   emailService.sendPasswordResetEmail(user.email, token).catch((err) => {
-    console.error("Failed to send password reset email:", err);
+    logger.error(
+      { err, userId: user.id, recipient: user.email },
+      "Failed to send password reset email",
+    );
   });
 
   return { token };

@@ -3,12 +3,14 @@
  */
 import "dotenv/config";
 import { ConfigError, getConfig } from "./config/index.js";
+import { getLogger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
 import { beginShutdown } from "./lifecycle/state.js";
 
 const GRACEFUL_TIMEOUT_MS = 10_000;
 
 async function main() {
+  const logger = getLogger();
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
   // Lazy-load app so config validation errors thrown during module init are catchable here.
@@ -16,7 +18,7 @@ async function main() {
   const { scheduleSessionCleanup } = await import("./jobs/sessionCleanup.js");
 
   const server = app.listen(port, () => {
-    console.log(`API listening on http://localhost:${port}`);
+    logger.info({ port }, "API server listening");
   });
   const cfg = getConfig();
   server.keepAliveTimeout = cfg.HTTP_SERVER_KEEPALIVE_TIMEOUT_MS;
@@ -26,27 +28,35 @@ async function main() {
   const stopSessionCleanup = scheduleSessionCleanup();
 
   function onSignal(sig: NodeJS.Signals) {
-    console.log(`[lifecycle] received ${sig}, beginning graceful shutdown`);
+    logger.info({ signal: sig }, "Received signal, beginning graceful shutdown");
     beginShutdown();
     stopSessionCleanup();
 
     const cleanup = async () => {
       try {
         await prisma.$disconnect();
+        logger.info("Database disconnected successfully");
       } catch (e) {
-        console.error("[lifecycle] prisma disconnect error:", e);
+        logger.error({ err: e }, "Prisma disconnect error");
       } finally {
         process.exit(0);
       }
     };
 
     server.close((err) => {
-      if (err) console.error("[lifecycle] server close error:", err);
+      if (err) {
+        logger.error({ err }, "Server close error");
+      } else {
+        logger.info("HTTP server closed");
+      }
       void cleanup();
     });
 
     setTimeout(() => {
-      console.error("[lifecycle] forced shutdown after timeout");
+      logger.error(
+        { timeoutMs: GRACEFUL_TIMEOUT_MS },
+        "Graceful shutdown timeout exceeded, forcing exit",
+      );
       process.exit(1);
     }, GRACEFUL_TIMEOUT_MS).unref();
   }
@@ -56,10 +66,11 @@ async function main() {
 }
 
 main().catch((err) => {
+  const logger = getLogger();
   if (err instanceof ConfigError) {
-    console.error("Invalid configuration:", err.errors);
+    logger.fatal({ errors: err.errors }, "Invalid configuration");
     process.exit(1);
   }
-  console.error(err);
+  logger.fatal({ err }, "Unhandled error during startup");
   process.exit(1);
 });

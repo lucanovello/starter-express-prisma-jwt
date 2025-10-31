@@ -1,58 +1,62 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { Logger } from "pino";
 
 import { getEmailService, resetEmailService } from "../src/services/emailService.js";
+import { getLogger, resetLogger } from "../src/lib/logger.js";
 
 describe("Email Service", () => {
   const ORIGINAL_ENV = { ...process.env };
+  let loggerInfoSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     resetEmailService();
+    resetLogger();
+    // Mock the logger's info method to verify structured logging
+    const logger = getLogger();
+    loggerInfoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
   });
 
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV };
     resetEmailService();
+    resetLogger();
+    loggerInfoSpy?.mockRestore();
   });
 
   test("uses console fallback when SMTP is not configured", () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
     const service = getEmailService();
-
     expect(service).toBeDefined();
-    expect(consoleSpy).not.toHaveBeenCalled(); // Not called until we send an email
-
-    consoleSpy.mockRestore();
+    expect(loggerInfoSpy).not.toHaveBeenCalled(); // Not called until we send an email
   });
 
-  test("console service logs verification emails", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
+  test("console service logs verification emails with structured data", async () => {
     const service = getEmailService();
     await service.sendVerificationEmail("test@example.com", "test-token-123");
 
-    expect(consoleSpy).toHaveBeenCalled();
-    const calls = consoleSpy.mock.calls.flat().join("\n");
-    expect(calls).toContain("test@example.com");
-    expect(calls).toContain("test-token-123");
-    expect(calls).toContain("Verification");
-
-    consoleSpy.mockRestore();
+    expect(loggerInfoSpy).toHaveBeenCalled();
+    // Check that structured logging was used with proper fields
+    const firstCall = loggerInfoSpy.mock.calls[0];
+    expect(firstCall[0]).toMatchObject({
+      emailType: "verification",
+      recipient: "test@example.com",
+      tokenLength: 14,
+    });
+    expect(firstCall[1]).toContain("Verification");
   });
 
-  test("console service logs password reset emails", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
+  test("console service logs password reset emails with structured data", async () => {
     const service = getEmailService();
     await service.sendPasswordResetEmail("user@example.com", "reset-token-456");
 
-    expect(consoleSpy).toHaveBeenCalled();
-    const calls = consoleSpy.mock.calls.flat().join("\n");
-    expect(calls).toContain("user@example.com");
-    expect(calls).toContain("reset-token-456");
-    expect(calls).toContain("Password Reset");
-
-    consoleSpy.mockRestore();
+    expect(loggerInfoSpy).toHaveBeenCalled();
+    // Check that structured logging was used with proper fields
+    const firstCall = loggerInfoSpy.mock.calls[0];
+    expect(firstCall[0]).toMatchObject({
+      emailType: "password-reset",
+      recipient: "user@example.com",
+      tokenLength: 15,
+    });
+    expect(firstCall[1]).toContain("Password reset");
   });
 
   test("returns same instance on subsequent calls (singleton)", () => {
