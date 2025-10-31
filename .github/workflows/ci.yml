@@ -34,11 +34,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for gitleaks
       - uses: actions/setup-node@v4
         with:
           node-version: 20.19.0
           cache: npm
       - run: npm ci
+      - name: Secret scanning
+        run: npm run secrets:scan
       - name: Dependency vulnerability audit
         run: npm run audit:ci
       - name: Prisma migrate & generate
@@ -55,20 +59,6 @@ jobs:
           name: openapi-spec
           path: openapi.json
           if-no-files-found: error
-
-  secret-scan:
-    name: Secret scanning (PR diff)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Gitleaks diff scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_VERSION: "8.24.3"
 
   infra-lint:
     name: Infrastructure lint
