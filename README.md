@@ -10,6 +10,19 @@ Minimal, batteries-included REST starter:
 - Liveness `/health` and readiness `/ready`
 - CI: Vitest + coverage artifact
 
+## Table of Contents
+
+- [Quickstart](#quickstart-local-dev)
+- [Environment Matrix](#environment-matrix)
+- [Testing](#test)
+- [API Documentation](#api-docs--clients)
+- [Configuration](#env)
+- [Deployment](#run-in-docker-prod-like)
+- [Contributing](#contributing)
+- [Security](#security-policy)
+- [Changelog](#changelog)
+- [Troubleshooting](#troubleshooting)
+
 ## Quickstart (local dev)
 
 ```bash
@@ -22,6 +35,8 @@ npm run dev
 # (Ensure you're using Node 20.x)
 # GET http://localhost:3000/health -> {"status":"ok"}
 ```
+
+> **First time here?** Check out [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed setup instructions.
 
 ## Environment matrix
 
@@ -286,8 +301,161 @@ docker compose -f compose.prod.yml ps redis
 docker compose -f compose.prod.yml logs redis
 ```
 
+#### Email Service Issues
+
+**Problem:** Emails not being sent in development
+
+**Solutions:**
+
+```bash
+# 1. Check if email service is configured
+# In development, emails log to console by default (no SMTP needed)
+
+# 2. For SMTP testing, configure these variables in .env:
+SMTP_HOST=smtp.ethereal.email
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-ethereal-user
+SMTP_PASS=your-ethereal-password
+
+# 3. Get free test credentials at https://ethereal.email
+```
+
+#### Authentication Token Errors
+
+**Problem:** JWT verification fails
+
+**Solutions:**
+
+```bash
+# 1. Ensure secrets are set correctly in .env
+JWT_ACCESS_SECRET=your-strong-secret-here
+JWT_REFRESH_SECRET=different-strong-secret-here
+
+# 2. Generate new secrets if needed
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# 3. Clear existing sessions
+# Delete all sessions from database or restart with fresh DB
+
+# 4. Check token expiry settings
+JWT_ACCESS_EXPIRY=15m  # Short-lived
+JWT_REFRESH_EXPIRY=7d  # Longer-lived
+```
+
+#### Coverage Threshold Errors
+
+**Problem:** Tests pass but coverage check fails
+
+**Solutions:**
+
+```bash
+# 1. Check current coverage
+npm run test:cov
+
+# 2. Identify uncovered lines in report
+open coverage/lcov-report/index.html
+
+# 3. Add tests for uncovered branches/functions
+# Thresholds: 85% lines, 85% functions, 80% branches, 70% statements
+
+# 4. Temporarily view detailed coverage
+npm run test:cov -- --reporter=verbose
+```
+
+#### Prisma Migration Issues
+
+**Problem:** Migrations fail or schema out of sync
+
+**Solutions:**
+
+```bash
+# 1. Reset development database (WARNING: Deletes all data)
+npx prisma migrate reset
+
+# 2. Generate Prisma client after schema changes
+npx prisma generate
+
+# 3. Create a new migration
+npx prisma migrate dev --name your_migration_name
+
+# 4. Apply migrations in production
+npx prisma migrate deploy
+
+# 5. View migration status
+npx prisma migrate status
+```
+
+#### Docker Build Failures
+
+**Problem:** Docker build fails or image won't start
+
+**Solutions:**
+
+```bash
+# 1. Clear Docker cache
+docker builder prune
+
+# 2. Rebuild without cache
+docker build --no-cache -t starter-api .
+
+# 3. Check logs
+docker logs <container-id>
+
+# 4. Verify environment variables are passed
+docker run --rm -e DATABASE_URL=$DATABASE_URL starter-api
+
+# 5. Test locally first
+npm run build
+node dist/index.js
+```
+
 ### Getting Help
 
-- **Issues:** https://github.com/lucanovello/starter-express-prisma-jwt/issues
-- **Discussions:** https://github.com/lucanovello/starter-express-prisma-jwt/discussions
-- **Documentation:** See `docs/ops/runbook.md` for operational guidance
+Still stuck? Here's where to get help:
+
+- **Documentation:**
+  - [CONTRIBUTING.md](./CONTRIBUTING.md) - Development setup and guidelines
+  - [SECURITY.md](./SECURITY.md) - Security policy and best practices
+  - [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) - Detailed developer guide
+  - [docs/RENOVATE.md](./docs/RENOVATE.md) - Dependency automation
+  - [docs/ops/runbook.md](./docs/ops/runbook.md) - Operational guidance
+
+- **Support:**
+  - [Issues](https://github.com/lucanovello/starter-express-prisma-jwt/issues) - Bug reports and feature requests
+  - [Discussions](https://github.com/lucanovello/starter-express-prisma-jwt/discussions) - Questions and community help
+
+## Contributing
+
+We welcome contributions! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for:
+
+- Development setup and workflow
+- Coding standards and best practices
+- Testing guidelines
+- Pull request process
+- Commit message conventions
+
+## Security Policy
+
+Security is a top priority. Please review [SECURITY.md](./SECURITY.md) for:
+
+- Reporting vulnerabilities (do not open public issues)
+- Supported versions
+- Security best practices
+- Known security features
+
+**Found a security issue?** Report it privately via [GitHub Security Advisories](https://github.com/lucanovello/starter-express-prisma-jwt/security/advisories/new).
+
+## Changelog
+
+All notable changes are documented in [CHANGELOG.md](./CHANGELOG.md), following [Keep a Changelog](https://keepachangelog.com/) format.
+
+**Current version:** 1.0.0
+
+## License
+
+This project is licensed under the ISC License - see the [LICENSE](./LICENSE) file for details.
+
+```
+
+```
