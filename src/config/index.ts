@@ -43,8 +43,10 @@ const EnvSchema = z
       .optional(),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().optional(),
+    SMTP_SECURE: z.string().optional(),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
+    SMTP_FROM: z.string().email().optional(),
     OAUTH_GOOGLE_CLIENT_ID: z.string().optional(),
     OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
     METRICS_ENABLED: z.string().optional(),
@@ -155,6 +157,14 @@ export type AppConfig = z.infer<typeof EnvSchema> & {
   metricsEnabled: boolean;
   metricsGuard: MetricsGuardConfig;
   rateLimitStore: RateLimitStoreConfig;
+  smtp: {
+    host: string | undefined;
+    port: number | undefined;
+    secure: boolean;
+    user: string | undefined;
+    pass: string | undefined;
+    from: string | undefined;
+  };
   auth: {
     emailVerificationRequired: boolean;
     emailVerificationTtlMs: number;
@@ -200,6 +210,15 @@ export function getConfig(): AppConfig {
     ? { type: "redis", url: redisUrl }
     : { type: "memory" };
 
+  const smtp = {
+    host: cfg.SMTP_HOST,
+    port: cfg.SMTP_PORT,
+    secure: parseBooleanEnv(cfg.SMTP_SECURE),
+    user: cfg.SMTP_USER,
+    pass: cfg.SMTP_PASS,
+    from: cfg.SMTP_FROM,
+  };
+
   const auth = {
     emailVerificationRequired: parseBooleanEnv(cfg.AUTH_EMAIL_VERIFICATION_REQUIRED),
     emailVerificationTtlMs: cfg.AUTH_EMAIL_VERIFICATION_TTL_MINUTES * 60 * 1000,
@@ -215,6 +234,7 @@ export function getConfig(): AppConfig {
     metricsEnabled,
     metricsGuard,
     rateLimitStore,
+    smtp,
     auth,
   };
   return cached!;
