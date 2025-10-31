@@ -312,6 +312,7 @@ docker compose -f compose.prod.yml logs redis
 ```bash
 # 1. Check if email service is configured
 # In development, emails log to console by default (no SMTP needed)
+# In production, the console fallback redacts tokens and logs a warning; configure SMTP for delivery.
 
 # 2. For SMTP testing, configure these variables in .env:
 SMTP_HOST=smtp.ethereal.email

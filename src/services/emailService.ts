@@ -8,41 +8,63 @@ export interface EmailService {
   sendPasswordResetEmail(to: string, token: string): Promise<void>;
 }
 
+type ConsoleEmailOptions = {
+  logTokens: boolean;
+};
+
 class ConsoleEmailService implements EmailService {
   private logger = getLogger();
+  private readonly logTokens: boolean;
 
-  async sendVerificationEmail(to: string, token: string): Promise<void> {
+  constructor(options: ConsoleEmailOptions) {
+    this.logTokens = options.logTokens;
+  }
+
+  private logMeta(emailType: string, to: string, token: string) {
+    const label =
+      emailType === "verification"
+        ? "Verification"
+        : emailType === "password-reset"
+          ? "Password reset"
+          : emailType;
     this.logger.info(
       {
-        emailType: "verification",
+        emailType,
         recipient: to,
         tokenLength: token.length,
       },
-      "Email (console): Verification email",
-    );
-    this.logger.info(
-      {
-        exampleLink: `https://yourapp.com/verify-email?token=${token}`,
-      },
-      "Verification token ready",
+      `Email (console): ${label} email`,
     );
   }
 
+  private logTokenHint(emailType: string, token: string, examplePath: string) {
+    if (this.logTokens) {
+      this.logger.info(
+        {
+          exampleLink: `https://yourapp.com${examplePath}${token}`,
+        },
+        `${emailType === "verification" ? "Verification" : "Password reset"} token ready`,
+      );
+      return;
+    }
+
+    this.logger.warn(
+      {
+        emailType,
+        tokenRedacted: true,
+      },
+      "Email token generated; token omitted from console logs. Configure SMTP for delivery.",
+    );
+  }
+
+  async sendVerificationEmail(to: string, token: string): Promise<void> {
+    this.logMeta("verification", to, token);
+    this.logTokenHint("verification", token, "/verify-email?token=");
+  }
+
   async sendPasswordResetEmail(to: string, token: string): Promise<void> {
-    this.logger.info(
-      {
-        emailType: "password-reset",
-        recipient: to,
-        tokenLength: token.length,
-      },
-      "Email (console): Password reset email",
-    );
-    this.logger.info(
-      {
-        exampleLink: `https://yourapp.com/reset-password?token=${token}`,
-      },
-      "Password reset token ready",
-    );
+    this.logMeta("password-reset", to, token);
+    this.logTokenHint("password-reset", token, "/reset-password?token=");
   }
 }
 
@@ -220,7 +242,9 @@ export function getEmailService(): EmailService {
     emailServiceInstance = new SmtpEmailService(transporter, config.smtp.from);
   } else {
     // Fallback to console logging for development
-    emailServiceInstance = new ConsoleEmailService();
+    emailServiceInstance = new ConsoleEmailService({
+      logTokens: config.NODE_ENV !== "production",
+    });
   }
 
   return emailServiceInstance;
