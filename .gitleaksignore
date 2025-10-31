@@ -1,15 +1,6 @@
 # Gitleaks ignore file
+# Only ignoring test fixtures that are clearly not real secrets
 
-# These are documented false positives (example values in documentation/tests)
-
-# Documentation examples showing secret format (not real secrets)
-
-cbb72259cfd98fdbe8f4e9ed41862ad9a6ff9162:SECURITY.md:generic-api-key:75
-cbb72259cfd98fdbe8f4e9ed41862ad9a6ff9162:SECURITY.md:generic-api-key:76
-cbb72259cfd98fdbe8f4e9ed41862ad9a6ff9162:PR6_SUMMARY.md:generic-api-key:155
-cbb72259cfd98fdbe8f4e9ed41862ad9a6ff9162:PR6_SUMMARY.md:generic-api-key:156
-
-# Test fixture values (not real secrets)
-
+# Test fixture values in tests/jwt.config.test.ts (patterns like "0123456789abcdef...")
 359afb5d113d6e99cdb2dc9d218ec472b5258e77:tests/jwt.config.test.ts:generic-api-key:11
 359afb5d113d6e99cdb2dc9d218ec472b5258e77:tests/jwt.config.test.ts:generic-api-key:12

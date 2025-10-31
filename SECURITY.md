@@ -100,7 +100,7 @@ RATE_LIMIT_REDIS_URL=redis://your-redis-server:6379
 # Metrics - Guard access to Prometheus metrics
 METRICS_ENABLED=true
 METRICS_GUARD=secret
-METRICS_GUARD_SECRET=your-strong-secret-here
+METRICS_GUARD_SECRET=<YOUR_STRONG_SECRET_HERE>
 
 # Email Verification - Require verified emails
 AUTH_EMAIL_VERIFICATION_REQUIRED=true

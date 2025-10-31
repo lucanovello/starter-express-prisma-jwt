@@ -315,8 +315,8 @@ docker compose -f compose.prod.yml logs redis
 SMTP_HOST=smtp.ethereal.email
 SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=your-ethereal-user
-SMTP_PASS=your-ethereal-password
+SMTP_USER=<YOUR_ETHEREAL_USERNAME>
+SMTP_PASS=<YOUR_ETHEREAL_PASSWORD>
 
 # 3. Get free test credentials at https://ethereal.email
 ```
@@ -329,8 +329,8 @@ SMTP_PASS=your-ethereal-password
 
 ```bash
 # 1. Ensure secrets are set correctly in .env
-JWT_ACCESS_SECRET=your-strong-secret-here
-JWT_REFRESH_SECRET=different-strong-secret-here
+JWT_ACCESS_SECRET=<YOUR_SECRET_HERE>
+JWT_REFRESH_SECRET=<YOUR_DIFFERENT_SECRET_HERE>
 
 # 2. Generate new secrets if needed
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
