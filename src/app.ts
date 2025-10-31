@@ -23,13 +23,14 @@ import { metricsMiddleware, metricsHandler } from "./metrics/index.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { attachUserToLog } from "./middleware/logUser.js";
 import { notFound } from "./middleware/notFound.js";
-import { registerSecurity } from "./middleware/security.js";
+import { registerSecurity, type SecurityTeardown } from "./middleware/security.js";
 import { auth as authRoutes } from "./routes/auth.js";
 import { protectedRoutes } from "./routes/protected.js";
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 const app = express();
+let securityTeardown: SecurityTeardown | null = null;
 
 type NodeEnv = AppConfig["NODE_ENV"];
 
@@ -202,7 +203,7 @@ const jsonParser = express.json({ limit: cfg.REQUEST_BODY_LIMIT }) as unknown as
 app.use(jsonParser);
 
 // Security baseline (helmet, CORS, rate limit, etc.)
-await registerSecurity(app);
+securityTeardown = await registerSecurity(app);
 
 // Metrics: request logging + /metrics endpoint
 app.use(metricsMiddleware);
@@ -263,3 +264,10 @@ app.use(notFound);
 app.use(errorHandler);
 
 export default app;
+
+export async function disposeSecurity(): Promise<void> {
+  const teardown = securityTeardown;
+  securityTeardown = null;
+  if (!teardown) return;
+  await teardown();
+}

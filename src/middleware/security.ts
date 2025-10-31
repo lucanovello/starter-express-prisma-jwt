@@ -16,8 +16,11 @@ import { AppError } from "../lib/errors.js";
 import type { Express, Request, RequestHandler } from "express";
 
 type RateLimitMiddleware = ReturnType<typeof rateLimit>;
+type RedisClient = ReturnType<typeof createClient>;
 
-const connectRedisClient = async (url: string) => {
+export type SecurityTeardown = () => Promise<void>;
+
+const connectRedisClient = async (url: string): Promise<RedisClient> => {
   const client = createClient({ url });
 
   try {
@@ -31,7 +34,7 @@ const connectRedisClient = async (url: string) => {
   return client;
 };
 
-export async function registerSecurity(app: Express): Promise<void> {
+export async function registerSecurity(app: Express): Promise<SecurityTeardown> {
   // Cast once where libs still expose Connect-typed handlers.
   app.use(helmet() as unknown as RequestHandler);
 
@@ -40,8 +43,7 @@ export async function registerSecurity(app: Express): Promise<void> {
   const isProd = cfg.NODE_ENV === "production";
   const allowUnknownOrigins = !isProd && allowlist.length === 0;
   const windowMs = cfg.RATE_LIMIT_WINDOW_SEC * 1000;
-  const toMax = (rpm: number) =>
-    Math.max(1, Math.ceil(rpm * (cfg.RATE_LIMIT_WINDOW_SEC / 60)));
+  const toMax = (rpm: number) => Math.max(1, Math.ceil(rpm * (cfg.RATE_LIMIT_WINDOW_SEC / 60)));
 
   app.use(
     cors((req, cb) => {
@@ -71,17 +73,19 @@ export async function registerSecurity(app: Express): Promise<void> {
       return cb(new AppError("Forbidden", 403, { code: "CORS_ORIGIN_FORBIDDEN" }), {
         credentials: true,
       });
-    }) as RequestHandler
+    }) as RequestHandler,
   );
 
   let globalStore: RedisStore | undefined;
   let authStore: RedisStore | undefined;
+  const redisClients: RedisClient[] = [];
 
   if (cfg.rateLimitStore.type === "redis") {
     // In test environments we deliberately avoid connecting to Redis to keep tests hermetic and fast.
     // With store undefined, express-rate-limit falls back to in-memory store. In production, a Redis store is required.
     if (cfg.NODE_ENV !== "test") {
       const client = await connectRedisClient(cfg.rateLimitStore.url);
+      redisClients.push(client);
       const sendCommand: SendCommandFn = (...args) =>
         client.sendCommand(args) as ReturnType<SendCommandFn>;
 
@@ -110,8 +114,8 @@ export async function registerSecurity(app: Express): Promise<void> {
         standardHeaders: true,
         legacyHeaders: false,
         store: globalStore,
-      })
-    )
+      }),
+    ),
   );
 
   // Stricter limiter for auth endpoints
@@ -124,7 +128,21 @@ export async function registerSecurity(app: Express): Promise<void> {
         standardHeaders: true,
         legacyHeaders: false,
         store: authStore,
-      })
-    )
+      }),
+    ),
   );
+
+  const teardown: SecurityTeardown = async () => {
+    await Promise.all(
+      redisClients.map(async (client) => {
+        try {
+          await client.disconnect();
+        } catch {
+          // Swallow disconnect errors; shutdown should continue.
+        }
+      }),
+    );
+  };
+
+  return teardown;
 }
