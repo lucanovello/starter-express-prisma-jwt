@@ -7,6 +7,8 @@ import { hashPassword, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken, tokenEqualsHash } from "../lib/tokenHash.js";
 
+import { getEmailService } from "./emailService.js";
+
 import type { Prisma } from "@prisma/client";
 
 type RefreshClaims = { sub: string; sid: string };
@@ -226,7 +228,10 @@ async function clearLoginAttempts(emailLowercase: string, ipAddress: string): Pr
 }
 
 // -------- Register --------
-export async function register(input: { email: string; password: string }): Promise<RegisterResult> {
+export async function register(input: {
+  email: string;
+  password: string;
+}): Promise<RegisterResult> {
   const { email, password } = input;
   const emailLowercase = normalizeEmail(email);
 
@@ -239,7 +244,7 @@ export async function register(input: { email: string; password: string }): Prom
   const auth = getConfig().auth;
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           email: emailLowercase,
@@ -255,6 +260,7 @@ export async function register(input: { email: string; password: string }): Prom
 
       if (auth.emailVerificationRequired) {
         return {
+          email: emailLowercase,
           emailVerificationRequired: true,
           verificationToken,
         };
@@ -273,12 +279,26 @@ export async function register(input: { email: string; password: string }): Prom
       });
 
       return {
+        email: emailLowercase,
         accessToken: minted.accessToken,
         refreshToken: minted.refreshToken,
         emailVerificationRequired: false,
         verificationToken,
       };
     });
+
+    // Send verification email after successful transaction
+    if (result.emailVerificationRequired && result.verificationToken) {
+      const emailService = getEmailService();
+      // Fire and forget - don't block the response
+      emailService.sendVerificationEmail(result.email, result.verificationToken).catch((err) => {
+        console.error("Failed to send verification email:", err);
+      });
+    }
+
+    // Remove email from result before returning
+    const { email: _email, ...returnResult } = result;
+    return returnResult;
   } catch (err: any) {
     if (err?.code === "P2002") {
       const target = Array.isArray(err.meta?.target) ? err.meta.target.join(",") : err.meta?.target;
@@ -291,10 +311,7 @@ export async function register(input: { email: string; password: string }): Prom
 }
 
 // -------- Login --------
-export async function login(
-  input: { email: string; password: string },
-  context: LoginContext,
-) {
+export async function login(input: { email: string; password: string }, context: LoginContext) {
   const auth = getConfig().auth;
   const emailLowercase = normalizeEmail(input.email);
   const ipAddress = sanitizeIp(context.ipAddress);
@@ -348,11 +365,7 @@ export async function refresh(incomingRefresh: string) {
   try {
     payload = verifyRefresh<RefreshClaims>(incomingRefresh);
   } catch (err) {
-    if (
-      err instanceof AppError &&
-      err.code === "SESSION_EXPIRED" &&
-      fallbackSessionId
-    ) {
+    if (err instanceof AppError && err.code === "SESSION_EXPIRED" && fallbackSessionId) {
       await prisma.session.updateMany({
         where: { id: fallbackSessionId },
         data: { valid: false, token: "" },
@@ -454,13 +467,11 @@ export async function verifyEmail(token: string): Promise<void> {
   });
 }
 
-export async function requestPasswordReset(
-  email: string,
-): Promise<{ token?: string }> {
+export async function requestPasswordReset(email: string): Promise<{ token?: string }> {
   const auth = getConfig().auth;
   const user = await prisma.user.findFirst({
     where: { email: { equals: email, mode: "insensitive" } },
-    select: { id: true },
+    select: { id: true, email: true },
   });
 
   if (!user) {
@@ -470,6 +481,12 @@ export async function requestPasswordReset(
   const token = await prisma.$transaction(async (tx) =>
     createPasswordResetToken(tx, user.id, auth),
   );
+
+  // Send password reset email - fire and forget
+  const emailService = getEmailService();
+  emailService.sendPasswordResetEmail(user.email, token).catch((err) => {
+    console.error("Failed to send password reset email:", err);
+  });
 
   return { token };
 }
@@ -522,7 +539,10 @@ export async function resetPassword(input: { token: string; password: string }):
   });
 }
 
-export function authenticateAccessToken(token: string): { userId: string; sessionId: string | null } {
+export function authenticateAccessToken(token: string): {
+  userId: string;
+  sessionId: string | null;
+} {
   if (!token) {
     throw new AppError("Unauthorized", 401, { code: "UNAUTHORIZED" });
   }
@@ -537,7 +557,10 @@ export function authenticateAccessToken(token: string): { userId: string; sessio
   return { userId, sessionId };
 }
 
-export async function listSessions(userId: string, currentSessionId: string | null): Promise<SessionSummary[]> {
+export async function listSessions(
+  userId: string,
+  currentSessionId: string | null,
+): Promise<SessionSummary[]> {
   const sessions = await prisma.session.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
