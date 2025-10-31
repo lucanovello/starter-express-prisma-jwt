@@ -338,6 +338,7 @@ This project implements several security best practices:
    - Optional by default (`AUTH_EMAIL_VERIFICATION_REQUIRED=false`)
    - Enable in production for additional security
    - Tokens sent via email (ensure SMTP security)
+   - Console fallback redacts tokens in production; if you see warnings about withheld tokens, configure SMTP so email content is delivered out-of-band
 
 4. **CORS**:
    - Permissive in dev/test for easier development
