@@ -66,6 +66,8 @@ docker compose ps
 # starter-express-...-db-1 postgres:15   Up About a minute
 ```
 
+> Optional: if you want to exercise the Redis-backed rate limiter locally, start the Redis helper container with `docker compose --profile rate-limit up -d redis` and then set `RATE_LIMIT_REDIS_URL=redis://localhost:6379` in your `.env`.
+
 ### 4. Database Migrations
 
 ```bash
