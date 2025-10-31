@@ -53,6 +53,12 @@
 2. To unblock specific users, delete their lockout keys (Prisma `Lockout` table) or flush Redis keys prefixed with `login_attempt`.
 3. Review recent auth logs for brute force IPs and update upstream firewall/CDN rules.
 
+### Rate limiting ignores forwarded client IP
+
+1. Confirm `TRUST_PROXY` matches your ingress topology (for example `1` for a single load balancer hop or a CIDR list for static proxy addresses).
+2. Ensure the proxy adds or preserves the correct `X-Forwarded-For` header; sanitise untrusted headers if your provider does not do this automatically.
+3. Check application logs (`req.ip`) to verify the expected client address is observed after trusting proxies.
+
 ### Metrics endpoint failing authentication
 
 1. Ensure `METRICS_ENABLED=true`.
@@ -75,5 +81,6 @@
 - `METRICS_ENABLED`: enable Prometheus metrics.
 - `METRICS_GUARD`, `METRICS_GUARD_SECRET`, `METRICS_GUARD_ALLOWLIST`: guard metrics endpoint.
 - `CORS_ORIGINS`: comma-separated allowlist; must be set for production.
+- `TRUST_PROXY`: Express `trust proxy` directive; default is `loopback`. Set to the number of proxy hops or a CIDR list that matches your ingress so client IPs are preserved for rate limiting and CIDR guards.
 - `RATE_LIMIT_REDIS_URL`: configure Redis connection; absence disables Redis-backed rate limiting.
 - Auth toggles: `AUTH_EMAIL_VERIFICATION_REQUIRED`, `AUTH_LOGIN_*` to adjust lockout thresholds.

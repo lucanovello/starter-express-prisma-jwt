@@ -58,6 +58,14 @@ describe("Environment configuration validation", () => {
     expect(config.auth.emailVerificationRequired).toBe(false);
   });
 
+  test("parses TRUST_PROXY env into an express-compatible value", () => {
+    process.env.TRUST_PROXY = "1";
+
+    const config = getConfig();
+
+    expect(config.trustProxy).toBe(1);
+  });
+
   test("converts duration strings to milliseconds", () => {
     process.env.AUTH_EMAIL_VERIFICATION_TTL_MINUTES = "60";
     process.env.AUTH_PASSWORD_RESET_TTL_MINUTES = "30";

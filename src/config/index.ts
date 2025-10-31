@@ -10,6 +10,45 @@ const splitCommaSeparated = (value: string | undefined): string[] =>
 const parseBooleanEnv = (value: string | undefined): boolean =>
   value != null && value.trim().toLowerCase() === "true";
 
+type TrustProxySetting = boolean | number | string | string[];
+
+const parseTrustProxySetting = (value: string): TrustProxySetting => {
+  const trimmed = value.trim();
+  if (trimmed === "") return false;
+
+  const lower = trimmed.toLowerCase();
+  if (["false", "off", "no"].includes(lower)) {
+    return false;
+  }
+  if (["true", "on", "yes"].includes(lower)) {
+    return true;
+  }
+  if (lower === "none") {
+    return false;
+  }
+
+  const numeric = Number(trimmed);
+  if (!Number.isNaN(numeric) && Number.isFinite(numeric)) {
+    return numeric;
+  }
+
+  if (trimmed.includes(",")) {
+    const parts = trimmed
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length === 0) {
+      return false;
+    }
+    if (parts.length === 1) {
+      return parts[0]!;
+    }
+    return parts;
+  }
+
+  return trimmed;
+};
+
 const validateCidr = (cidr: string): boolean => {
   try {
     ipaddr.parseCIDR(cidr);
@@ -31,6 +70,7 @@ const EnvSchema = z
     JWT_ACCESS_EXPIRY: z.string().default("15m"),
     JWT_REFRESH_EXPIRY: z.string().default("7d"),
     CORS_ORIGINS: z.string().optional(),
+    TRUST_PROXY: z.string().default("loopback"),
     LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
       .default("info"),
@@ -156,6 +196,7 @@ export type AppConfig = z.infer<typeof EnvSchema> & {
   corsOriginsParsed: string[];
   metricsEnabled: boolean;
   metricsGuard: MetricsGuardConfig;
+  trustProxy: TrustProxySetting;
   rateLimitStore: RateLimitStoreConfig;
   smtp: {
     host: string | undefined;
@@ -195,6 +236,7 @@ export function getConfig(): AppConfig {
   const cfg = parsed.data;
   const corsOriginsParsed = splitCommaSeparated(cfg.CORS_ORIGINS);
   const metricsEnabled = parseBooleanEnv(cfg.METRICS_ENABLED);
+  const trustProxy = parseTrustProxySetting(cfg.TRUST_PROXY);
   const metricsGuard: MetricsGuardConfig =
     cfg.METRICS_GUARD === "secret"
       ? { type: "secret", secret: cfg.METRICS_GUARD_SECRET!.trim() }
@@ -232,6 +274,7 @@ export function getConfig(): AppConfig {
     ...cfg,
     corsOriginsParsed,
     metricsEnabled,
+    trustProxy,
     metricsGuard,
     rateLimitStore,
     smtp,
