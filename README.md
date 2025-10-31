@@ -151,6 +151,17 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 - `POST /auth/logout-all` revokes all refresh tokens for the authenticated user.
 - Login lockouts: repeated failures (IP + email) trigger a temporary `429 LOGIN_LOCKED` until the configured window elapses.
 
+## Dependency management
+
+This project uses [Renovate](https://docs.renovatebot.com/) for automated dependency updates:
+
+- **Auto-merge**: Patch and minor updates merge automatically after 3-day stability period
+- **Manual review**: Major updates require approval (may contain breaking changes)
+- **Security first**: Critical vulnerabilities are updated immediately
+- **Weekly schedule**: Updates run Monday mornings to give you time to review
+
+See `docs/RENOVATE.md` for full configuration details and customization options.
+
 ## Edge hardening
 
 - Deploy behind a TLS-terminating reverse proxy or CDN that enforces HSTS and handles TLS certificates.
