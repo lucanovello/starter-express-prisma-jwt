@@ -189,11 +189,6 @@ test("rate limiter honours x-forwarded-for when trusting proxies", async () => {
   process.env.TRUST_PROXY = "1";
   process.env.RATE_LIMIT_RPM = "2";
   process.env.RATE_LIMIT_WINDOW_SEC = "60";
-  process.env.JWT_ACCESS_SECRET = "0123456789abcdef0123456789abcdef";
-  process.env.JWT_REFRESH_SECRET = "fedcba9876543210fedcba9876543210";
-  process.env.JWT_ACCESS_EXPIRY = "15m";
-  process.env.JWT_REFRESH_EXPIRY = "7d";
-
   const mod = await import("../src/app.js");
   const app = mod.default;
 
