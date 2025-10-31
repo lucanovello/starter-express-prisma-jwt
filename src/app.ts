@@ -133,6 +133,7 @@ const isIpAllowed = (ip: string, allowlist: string[]): boolean => {
 
 // Structured logging with request correlation.
 const cfg = getConfig();
+app.set("trust proxy", cfg.trustProxy);
 const redactionPaths = [
   "req.headers.authorization",
   "req.headers.cookie",
