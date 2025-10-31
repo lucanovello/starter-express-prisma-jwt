@@ -1,0 +1,187 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Automated dependency updates for starter-express-prisma-jwt",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":enablePreCommit",
+    "group:monorepos",
+    "group:recommended",
+    "workarounds:all"
+  ],
+  "timezone": "America/New_York",
+  "schedule": ["before 6am on Monday"],
+  "labels": ["dependencies", "renovate"],
+  "assignees": [],
+  "reviewers": [],
+  "prConcurrentLimit": 5,
+  "prCreation": "immediate",
+  "prHourlyLimit": 0,
+  "minimumReleaseAge": "3 days",
+  "stabilityDays": 3,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security", "dependencies"],
+    "minimumReleaseAge": null,
+    "stabilityDays": 0,
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "description": "Auto-merge patch and minor updates for non-major dependencies",
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash",
+      "ignoreTests": false,
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Auto-merge patch updates for major dependencies (more conservative)",
+      "matchUpdateTypes": ["patch"],
+      "matchDepTypes": ["dependencies"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Separate major updates (require manual review)",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major-update"],
+      "reviewers": []
+    },
+    {
+      "description": "High priority security updates - immediate with no waiting period",
+      "matchDatasources": ["npm"],
+      "matchUpdateTypes": ["patch"],
+      "vulnerabilitySeverity": "high",
+      "automerge": true,
+      "minimumReleaseAge": null,
+      "stabilityDays": 0,
+      "labels": ["security", "dependencies", "high-priority"]
+    },
+    {
+      "description": "Critical security updates - immediate with no waiting period",
+      "matchDatasources": ["npm"],
+      "vulnerabilitySeverity": "critical",
+      "automerge": true,
+      "minimumReleaseAge": null,
+      "stabilityDays": 0,
+      "labels": ["security", "dependencies", "critical"]
+    },
+    {
+      "description": "Group TypeScript with @types packages",
+      "groupName": "TypeScript and types",
+      "matchPackageNames": ["typescript"],
+      "matchPackagePrefixes": ["@types/"]
+    },
+    {
+      "description": "Group ESLint packages",
+      "groupName": "ESLint packages",
+      "matchPackageNames": ["eslint"],
+      "matchPackagePrefixes": ["eslint-", "@eslint/", "@typescript-eslint/"]
+    },
+    {
+      "description": "Group Vitest packages",
+      "groupName": "Vitest packages",
+      "matchPackageNames": ["vitest"],
+      "matchPackagePrefixes": ["@vitest/"]
+    },
+    {
+      "description": "Group Prisma packages",
+      "groupName": "Prisma packages",
+      "matchPackageNames": ["prisma", "@prisma/client"]
+    },
+    {
+      "description": "Group Pino logging packages",
+      "groupName": "Pino logging packages",
+      "matchPackageNames": ["pino", "pino-http", "pino-pretty"]
+    },
+    {
+      "description": "Pin Docker images to specific digests for security",
+      "matchDatasources": ["docker"],
+      "pinDigests": true
+    },
+    {
+      "description": "Docker base images - check weekly",
+      "matchDatasources": ["docker"],
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "GitHub Actions - weekly updates",
+      "matchManagers": ["github-actions"],
+      "schedule": ["before 6am on Monday"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Disable major updates for stable production dependencies",
+      "matchPackageNames": ["express", "prisma", "@prisma/client"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ],
+  "npm": {
+    "stabilityDays": 3,
+    "minimumReleaseAge": "3 days"
+  },
+  "docker": {
+    "enabled": true,
+    "pinDigests": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "automergeType": "pr",
+    "schedule": ["before 3am on the first day of the month"]
+  },
+  "postUpdateOptions": ["npmDedupe"],
+  "rangeStrategy": "bump",
+  "semanticCommits": "enabled",
+  "commitMessagePrefix": "chore(deps):",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{#if isPinDigest}}{{{newDigestShort}}}{{else}}{{#if isMajor}}{{prettyNewMajor}}{{else}}{{#if isSingleVersion}}{{prettyNewVersion}}{{else}}{{#if newValue}}{{{newValue}}}{{else}}{{{newDigestShort}}}{{/if}}{{/if}}{{/if}}{{/if}}",
+  "prTitle": "{{semanticPrefix}}{{#if isPin}}pin{{else}}update{{/if}} {{depName}} to {{#if isRange}}{{newValue}}{{else}}{{#if isMajor}}v{{newMajor}}{{else}}{{newVersion}}{{/if}}{{/if}}",
+  "prBodyTemplate": "{{{header}}}{{{notes}}}{{{changelogs}}}{{{configDescription}}}{{{upgrades}}}{{{footer}}}",
+  "prBodyColumns": ["Package", "Update", "Type", "Change", "Pending"],
+  "prBodyNotes": [
+    "This PR has been generated by Renovate Bot.",
+    "",
+    "### Testing",
+    "- All tests must pass before auto-merge",
+    "- Coverage thresholds must be maintained",
+    "- Lint and typecheck must pass",
+    "",
+    "### Auto-merge Policy",
+    "- **Patch & Minor updates**: Auto-merge after 3 day stability period",
+    "- **Major updates**: Require manual review",
+    "- **Security fixes**: Immediate auto-merge (no waiting period)",
+    "",
+    "Please review the changelog and test results before merging major updates."
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Node.js version in Dockerfile",
+      "fileMatch": ["^Dockerfile$"],
+      "matchStrings": ["FROM node:(?<currentValue>.*?)-alpine"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "node",
+      "versioningTemplate": "node"
+    },
+    {
+      "customType": "regex",
+      "description": "Update .nvmrc file",
+      "fileMatch": ["^\\.nvmrc$"],
+      "matchStrings": ["(?<currentValue>.*)"],
+      "datasourceTemplate": "node",
+      "depNameTemplate": "node",
+      "versioningTemplate": "node"
+    }
+  ],
+  "ignoreDeps": [],
+  "ignorePresets": []
+}
