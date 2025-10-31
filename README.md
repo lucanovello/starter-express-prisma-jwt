@@ -43,10 +43,28 @@ Operational runbooks live in `docs/ops/runbook.md`. Kubernetes starter manifests
 
 ## Test
 
+### Local Testing
+
 ```bash
+# Run tests (uses .env.test for configuration)
 npm test
-npm run test:cov  # uploads lcov artifact in CI
+
+# Run tests with coverage
+npm run test:cov
+
+# Run full check suite (typecheck + lint + test with coverage)
+npm run check
 ```
+
+**Note:** Tests automatically use `.env.test` configuration. If you need to customize test environment variables, copy `.env.test.example` to `.env.test` and modify as needed (though defaults should work out of the box).
+
+### Test Database
+
+Tests use a separate database (`starter_test`) to avoid conflicts with development data. The test setup automatically:
+
+- Connects to `postgresql://postgres:postgres@localhost:5432/starter_test`
+- Resets the database between test suites
+- Uses in-memory rate limiting (no Redis required)
 
 ## API docs & clients
 
@@ -65,30 +83,6 @@ npm run test:cov  # uploads lcov artifact in CI
 
 | Name                                | Example                                              | Notes                                                                 |
 | ----------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
-| DATABASE_URL                        | postgres://user:pass@host:5432/starter?schema=public | Postgres DSN                                                          |
-| JWT_ACCESS_SECRET                   | dev-access                                           | required                                                              |
-| JWT_REFRESH_SECRET                  | dev-refresh                                          | required                                                              |
-| JWT_ACCESS_EXPIRY                   | 15m                                                  | default 15m                                                           |
-| JWT_REFRESH_EXPIRY                  | 7d                                                   | default 7d                                                            |
-| PORT                                | 3000                                                 | optional                                                              |
-| CORS_ORIGINS                        | https://app.example.com                              | comma-separated allowlist, required in production                     |
-| RATE_LIMIT_REDIS_URL                | redis://cache:6379                                   | required in production                                                |
-| METRICS_ENABLED                     | false                                                | Enable Prometheus `/metrics`; defaults off in production              |
-| METRICS_GUARD                       | secret                                               | Use `secret` (shared header) or `cidr` (IP allowlist) in prod         |
-| METRICS_GUARD_SECRET                | prod-metrics-secret                                  | Required when `METRICS_GUARD=secret`; clients send `x-metrics-secret` |
-| METRICS_GUARD_ALLOWLIST             | 203.0.113.0/24                                       | Comma-separated CIDRs when `METRICS_GUARD=cidr`                       |
-| AUTH_EMAIL_VERIFICATION_REQUIRED    | false                                                | defaults to false; when true, new sign-ins require verified email     |
-| AUTH_EMAIL_VERIFICATION_TTL_MINUTES | 60                                                   | TTL for verification tokens (minutes)                                 |
-| AUTH_PASSWORD_RESET_TTL_MINUTES     | 30                                                   | TTL for password reset tokens (minutes)                               |
-| AUTH_LOGIN_MAX_ATTEMPTS             | 5                                                    | Maximum failed logins per IP/email before lockout                     |
-| AUTH_LOGIN_LOCKOUT_MINUTES          | 15                                                   | Lockout duration (minutes)                                            |
-| AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES   | 15                                                   | Rolling window for counting login attempts (minutes)                  |
-| REQUEST_BODY_LIMIT                  | 100kb                                                | optional override for express.json()                                  |
-| HTTP_SERVER_REQUEST_TIMEOUT_MS      | 30000                                                | optional override, default 30s                                        |
-| HTTP_SERVER_HEADERS_TIMEOUT_MS      | 60000                                                | optional override, default 60s                                        |
-| HTTP_SERVER_KEEPALIVE_TIMEOUT_MS    | 5000                                                 | optional override, default 5s                                         |
-| Name                                | Example                                              | Notes                                                                 |
-| ----------------------------------- | ---------------------------------------------------- | -----------------------------------------------------------------     |
 | DATABASE_URL                        | postgres://user:pass@host:5432/starter?schema=public | Postgres DSN                                                          |
 | JWT_ACCESS_SECRET                   | dev-access                                           | required                                                              |
 | JWT_REFRESH_SECRET                  | dev-refresh                                          | required                                                              |
@@ -167,3 +161,122 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 
 - `GET /version` -> `{ version, gitSha, buildTime }`
 - Versioning policy: routes are treated as **v1** today. Mount behind `/v1` at the gateway and reserve new `/v{n}` prefixes for breaking changes.
+
+## Troubleshooting
+
+### Common Issues
+
+#### Database Connection Errors
+
+**Problem:** `Error: Can't reach database server`
+
+**Solutions:**
+
+```bash
+# 1. Ensure Postgres is running
+docker compose ps db
+
+# 2. Start the database if needed
+docker compose up -d db
+
+# 3. Verify connection string in .env matches docker-compose.yml
+# Default: postgresql://postgres:postgres@localhost:5432/starter?schema=public
+
+# 4. Check if port 5432 is already in use
+lsof -i :5432  # macOS/Linux
+netstat -ano | findstr :5432  # Windows
+```
+
+#### Test Failures
+
+**Problem:** Tests fail with database errors
+
+**Solutions:**
+
+```bash
+# 1. Ensure test database exists and migrations are applied
+docker compose up -d db
+npx prisma migrate deploy
+
+# 2. Reset test database if corrupted
+dropdb starter_test && createdb starter_test  # If psql is installed
+# OR restart the Docker container
+docker compose restart db
+
+# 3. Verify .env.test configuration
+cat .env.test  # Should point to starter_test database
+```
+
+#### Git Hooks Not Running
+
+**Problem:** Commits succeed without running linters/formatters
+
+**Solutions:**
+
+```bash
+# 1. Reinstall hooks
+npm run prepare
+
+# 2. Verify hooks are executable (macOS/Linux)
+chmod +x .husky/pre-commit .husky/pre-push
+
+# 3. Check if husky is installed
+ls -la .husky/
+```
+
+#### Type Errors After Dependencies Update
+
+**Problem:** TypeScript compilation fails after `npm install`
+
+**Solutions:**
+
+```bash
+# 1. Regenerate Prisma client
+npx prisma generate
+
+# 2. Clear TypeScript build cache
+rm -rf node_modules/.cache
+npm run typecheck
+
+# 3. Verify Node version
+node --version  # Should be 20.19.0 or compatible with 20.x
+```
+
+#### Port Already in Use
+
+**Problem:** `Error: listen EADDRINUSE: address already in use :::3000`
+
+**Solutions:**
+
+```bash
+# 1. Find and kill process using port 3000
+lsof -ti:3000 | xargs kill -9  # macOS/Linux
+netstat -ano | findstr :3000  # Windows (note the PID, then: taskkill /PID <PID> /F)
+
+# 2. Use a different port
+PORT=3001 npm run dev
+```
+
+#### Redis Connection Issues (Production)
+
+**Problem:** Rate limiting fails in production
+
+**Solutions:**
+
+```bash
+# 1. Verify RATE_LIMIT_REDIS_URL is set correctly
+echo $RATE_LIMIT_REDIS_URL
+
+# 2. Test Redis connection
+redis-cli -u $RATE_LIMIT_REDIS_URL ping
+
+# 3. Check Redis is running in compose setup
+docker compose -f compose.prod.yml ps redis
+docker compose -f compose.prod.yml logs redis
+```
+
+### Getting Help
+
+- **Issues:** https://github.com/lucanovello/starter-express-prisma-jwt/issues
+- **Discussions:** https://github.com/lucanovello/starter-express-prisma-jwt/discussions
+- **Documentation:** See `docs/ops/runbook.md` for operational guidance
