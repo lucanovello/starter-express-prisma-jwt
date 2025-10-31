@@ -19,124 +19,130 @@ const validateCidr = (cidr: string): boolean => {
   }
 };
 
-const EnvSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  PORT: z.coerce.number().default(3000),
-  DATABASE_URL: z.string(),
-  JWT_ACCESS_SECRET: z.string().min(32, "JWT access secret must be at least 32 characters long"),
-  JWT_REFRESH_SECRET: z.string().min(32, "JWT refresh secret must be at least 32 characters long"),
-  JWT_ACCESS_EXPIRY: z.string().default("15m"),
-  JWT_REFRESH_EXPIRY: z.string().default("7d"),
-  CORS_ORIGINS: z.string().optional(),
-  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
-  RATE_LIMIT_RPM: z.coerce.number().default(600),
-  RATE_LIMIT_WINDOW_SEC: z.coerce.number().default(900),
-  RATE_LIMIT_RPM_AUTH: z.coerce.number().default(120),
-  RATE_LIMIT_REDIS_URL: z
-    .string()
-    .url("RATE_LIMIT_REDIS_URL must be a valid URL (e.g. redis://:pass@host:6379)")
-    .optional(),
-  SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.coerce.number().optional(),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
-  OAUTH_GOOGLE_CLIENT_ID: z.string().optional(),
-  OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
-  METRICS_ENABLED: z.string().optional(),
-  METRICS_GUARD: z.enum(["none", "secret", "cidr"]).default("none"),
-  METRICS_GUARD_SECRET: z.string().optional(),
-  METRICS_GUARD_ALLOWLIST: z.string().optional(),
-  SESSION_CLEANUP_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
-  REQUEST_BODY_LIMIT: z.string().default("100kb"),
-  HTTP_SERVER_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
-  HTTP_SERVER_HEADERS_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
-  HTTP_SERVER_KEEPALIVE_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
-  AUTH_EMAIL_VERIFICATION_REQUIRED: z.coerce.boolean().default(false),
-  AUTH_EMAIL_VERIFICATION_TTL_MINUTES: z.coerce.number().int().positive().default(60),
-  AUTH_PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
-  AUTH_LOGIN_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
-  AUTH_LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
-  AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES: z.coerce.number().int().positive().default(15),
-}).superRefine((data, ctx) => {
-  if (data.METRICS_GUARD === "secret") {
-    const secret = data.METRICS_GUARD_SECRET?.trim();
-    if (!secret) {
+const EnvSchema = z
+  .object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    PORT: z.coerce.number().default(3000),
+    DATABASE_URL: z.string(),
+    JWT_ACCESS_SECRET: z.string().min(32, "JWT access secret must be at least 32 characters long"),
+    JWT_REFRESH_SECRET: z
+      .string()
+      .min(32, "JWT refresh secret must be at least 32 characters long"),
+    JWT_ACCESS_EXPIRY: z.string().default("15m"),
+    JWT_REFRESH_EXPIRY: z.string().default("7d"),
+    CORS_ORIGINS: z.string().optional(),
+    LOG_LEVEL: z
+      .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+      .default("info"),
+    RATE_LIMIT_RPM: z.coerce.number().default(600),
+    RATE_LIMIT_WINDOW_SEC: z.coerce.number().default(900),
+    RATE_LIMIT_RPM_AUTH: z.coerce.number().default(120),
+    RATE_LIMIT_REDIS_URL: z
+      .string()
+      .url("RATE_LIMIT_REDIS_URL must be a valid URL (e.g. redis://:pass@host:6379)")
+      .optional(),
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().optional(),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    OAUTH_GOOGLE_CLIENT_ID: z.string().optional(),
+    OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
+    METRICS_ENABLED: z.string().optional(),
+    METRICS_GUARD: z.enum(["none", "secret", "cidr"]).default("none"),
+    METRICS_GUARD_SECRET: z.string().optional(),
+    METRICS_GUARD_ALLOWLIST: z.string().optional(),
+    SESSION_CLEANUP_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
+    REQUEST_BODY_LIMIT: z.string().default("100kb"),
+    HTTP_SERVER_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+    HTTP_SERVER_HEADERS_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+    HTTP_SERVER_KEEPALIVE_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+    AUTH_EMAIL_VERIFICATION_REQUIRED: z.string().optional(),
+    AUTH_EMAIL_VERIFICATION_TTL_MINUTES: z.coerce.number().int().positive().default(60),
+    AUTH_PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
+    AUTH_LOGIN_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+    AUTH_LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
+    AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES: z.coerce.number().int().positive().default(15),
+  })
+  .superRefine((data, ctx) => {
+    if (data.METRICS_GUARD === "secret") {
+      const secret = data.METRICS_GUARD_SECRET?.trim();
+      if (!secret) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["METRICS_GUARD_SECRET"],
+          message: "METRICS_GUARD_SECRET is required when METRICS_GUARD=secret",
+        });
+      }
+    } else if (data.METRICS_GUARD_SECRET) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["METRICS_GUARD_SECRET"],
-        message: "METRICS_GUARD_SECRET is required when METRICS_GUARD=secret",
+        message: "METRICS_GUARD_SECRET provided but METRICS_GUARD is not set to secret",
       });
     }
-  } else if (data.METRICS_GUARD_SECRET) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["METRICS_GUARD_SECRET"],
-      message: "METRICS_GUARD_SECRET provided but METRICS_GUARD is not set to secret",
-    });
-  }
 
-  if (data.METRICS_GUARD === "cidr") {
-    const allowlist = splitCommaSeparated(data.METRICS_GUARD_ALLOWLIST);
-    if (allowlist.length === 0) {
+    if (data.METRICS_GUARD === "cidr") {
+      const allowlist = splitCommaSeparated(data.METRICS_GUARD_ALLOWLIST);
+      if (allowlist.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["METRICS_GUARD_ALLOWLIST"],
+          message: "Provide at least one CIDR when METRICS_GUARD=cidr",
+        });
+        return;
+      }
+
+      const invalid = allowlist.filter((cidr) => !validateCidr(cidr));
+      if (invalid.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["METRICS_GUARD_ALLOWLIST"],
+          message: `Invalid CIDR entries: ${invalid.join(", ")}`,
+        });
+      }
+    } else if (data.METRICS_GUARD_ALLOWLIST) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["METRICS_GUARD_ALLOWLIST"],
-        message: "Provide at least one CIDR when METRICS_GUARD=cidr",
-      });
-      return;
-    }
-
-    const invalid = allowlist.filter((cidr) => !validateCidr(cidr));
-    if (invalid.length > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["METRICS_GUARD_ALLOWLIST"],
-        message: `Invalid CIDR entries: ${invalid.join(", ")}`,
+        message: "METRICS_GUARD_ALLOWLIST provided but METRICS_GUARD is not set to cidr",
       });
     }
-  } else if (data.METRICS_GUARD_ALLOWLIST) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["METRICS_GUARD_ALLOWLIST"],
-      message: "METRICS_GUARD_ALLOWLIST provided but METRICS_GUARD is not set to cidr",
-    });
-  }
-  if (data.RATE_LIMIT_REDIS_URL?.trim() === "") {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["RATE_LIMIT_REDIS_URL"],
-      message: "RATE_LIMIT_REDIS_URL cannot be blank",
-    });
-  }
-
-  if (data.NODE_ENV === "production") {
-    const metricsEnabled = parseBooleanEnv(data.METRICS_ENABLED);
-    if (metricsEnabled && data.METRICS_GUARD === "none") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["METRICS_GUARD"],
-        message: "METRICS_GUARD must be secret or cidr when METRICS_ENABLED=true in production",
-      });
-    }
-
-    const allowlist = splitCommaSeparated(data.CORS_ORIGINS);
-    if (allowlist.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["CORS_ORIGINS"],
-        message: "Set CORS_ORIGINS with at least one allowed origin in production",
-      });
-    }
-    const redisUrl = data.RATE_LIMIT_REDIS_URL?.trim();
-    if (!redisUrl) {
+    if (data.RATE_LIMIT_REDIS_URL?.trim() === "") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["RATE_LIMIT_REDIS_URL"],
-        message: "RATE_LIMIT_REDIS_URL is required in production",
+        message: "RATE_LIMIT_REDIS_URL cannot be blank",
       });
     }
-  }
-});
+
+    if (data.NODE_ENV === "production") {
+      const metricsEnabled = parseBooleanEnv(data.METRICS_ENABLED);
+      if (metricsEnabled && data.METRICS_GUARD === "none") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["METRICS_GUARD"],
+          message: "METRICS_GUARD must be secret or cidr when METRICS_ENABLED=true in production",
+        });
+      }
+
+      const allowlist = splitCommaSeparated(data.CORS_ORIGINS);
+      if (allowlist.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["CORS_ORIGINS"],
+          message: "Set CORS_ORIGINS with at least one allowed origin in production",
+        });
+      }
+      const redisUrl = data.RATE_LIMIT_REDIS_URL?.trim();
+      if (!redisUrl) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["RATE_LIMIT_REDIS_URL"],
+          message: "RATE_LIMIT_REDIS_URL is required in production",
+        });
+      }
+    }
+  });
 
 export class ConfigError extends Error {
   constructor(public readonly errors: Record<string, string[]>) {
@@ -195,7 +201,7 @@ export function getConfig(): AppConfig {
     : { type: "memory" };
 
   const auth = {
-    emailVerificationRequired: cfg.AUTH_EMAIL_VERIFICATION_REQUIRED,
+    emailVerificationRequired: parseBooleanEnv(cfg.AUTH_EMAIL_VERIFICATION_REQUIRED),
     emailVerificationTtlMs: cfg.AUTH_EMAIL_VERIFICATION_TTL_MINUTES * 60 * 1000,
     passwordResetTtlMs: cfg.AUTH_PASSWORD_RESET_TTL_MINUTES * 60 * 1000,
     loginMaxAttempts: cfg.AUTH_LOGIN_MAX_ATTEMPTS,
