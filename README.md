@@ -154,6 +154,7 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 ## Rate limiting + timeouts
 
 - Redis is required for rate-limit persistence in production (`RATE_LIMIT_REDIS_URL`).
+- Local development defaults to in-memory throttling. Uncomment `RATE_LIMIT_REDIS_URL` after starting the optional Redis container (e.g. `docker compose --profile rate-limit up -d redis`) if you want to exercise the Redis-backed path.
 - Express trusts proxy headers via `TRUST_PROXY`. The default `loopback` works for local dev; set it to the number of proxy hops (e.g. `1`) or a CIDR list that matches your ingress so rate limiting and CIDR guards see the real client IP.
 - Memory stores are only used in dev/test. Misconfiguration fails fast on boot.
 - `express.json` is capped at `REQUEST_BODY_LIMIT` (defaults to `100kb`) to limit abuse; adjust via env if necessary.
