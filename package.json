@@ -5,6 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "prepare": "husky",
     "predev": "node scripts/stamp-build-meta.mjs",
     "postinstall": "prisma generate",
     "pretest": "node scripts/stamp-build-meta.mjs",
