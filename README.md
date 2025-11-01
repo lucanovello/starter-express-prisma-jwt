@@ -53,7 +53,9 @@ npm run dev
 - `compose.prod.yml` builds the `runner` stage from `Dockerfile`, then starts Postgres and Redis with health checks before the API.
 - The API container keeps `npx prisma migrate deploy` as its entrypoint before `node dist/index.js`.
 - Redis is mandatory in production to back rate limiting (`RATE_LIMIT_REDIS_URL`); the container exits unhealthy if Redis fails.
-- Pass a hardened env file (e.g. `.env.production`) via `--env-file` or inject secrets through your orchestrator; `.env` remains git-ignored.
+- **Before first deploy**: Copy `.env.production.example` to `.env.production` and replace all placeholder values with strong secrets. Use `openssl rand -base64 32` to generate JWT secrets and metrics secrets.
+- Pass your hardened `.env.production` file via `--env-file` or inject secrets through your orchestrator; `.env` and `.env.production` remain git-ignored.
+- `METRICS_GUARD` and `METRICS_GUARD_SECRET` are now **required** in production when `METRICS_ENABLED=true`; weak defaults have been removed to prevent security misconfigurations.
 - Keep `METRICS_ENABLED=false` unless you have a guarded Prometheus scraper; when enabling, also set `METRICS_GUARD` + secret/allowlist.
 
 Operational runbooks live in `docs/ops/runbook.md`. Kubernetes starter manifests are available in `docs/ops/kubernetes` if you prefer deploying outside Docker Compose.
