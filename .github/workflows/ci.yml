@@ -99,10 +99,12 @@ jobs:
       - name: Run Trivy vulnerability scanner (table output)
         uses: aquasecurity/trivy-action@0.30.0
         continue-on-error: true
+        env:
+          TRIVY_FORMAT: table
         with:
           image-ref: starter-app:${{ github.sha }}
           format: table
           severity: CRITICAL,HIGH
       - name: Fail if vulnerabilities found
         run: |
-          trivy image --quiet --exit-code 1 --severity CRITICAL,HIGH starter-app:${{ github.sha }}
+          trivy image --exit-code 1 --severity CRITICAL,HIGH starter-app:${{ github.sha }}
