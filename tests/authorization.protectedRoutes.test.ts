@@ -102,3 +102,14 @@ test("ownership guard rejects other users", async () => {
     .set("Authorization", `Bearer ${intruder.accessToken}`)
     .expect(403);
 });
+
+test("protected user route validates uuid param", async () => {
+  const admin = await createUser("ADMIN");
+
+  const res = await request(app)
+    .get("/protected/users/not-a-uuid")
+    .set("Authorization", `Bearer ${admin.accessToken}`)
+    .expect(400);
+
+  expect(res.body?.error?.code).toBe("VALIDATION");
+});
