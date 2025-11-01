@@ -8,6 +8,81 @@ export interface EmailService {
   sendPasswordResetEmail(to: string, token: string): Promise<void>;
 }
 
+/**
+ * Retry configuration for email sending
+ */
+interface RetryConfig {
+  maxAttempts: number;
+  initialDelayMs: number;
+  maxDelayMs: number;
+  backoffMultiplier: number;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxAttempts: 3,
+  initialDelayMs: 1000,
+  maxDelayMs: 10000,
+  backoffMultiplier: 2,
+};
+
+/**
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry wrapper with exponential backoff
+ * @param fn - Async function to retry
+ * @param config - Retry configuration
+ * @returns Promise with the function result
+ * @throws Error if all retry attempts fail
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  config: RetryConfig = DEFAULT_RETRY_CONFIG,
+): Promise<T> {
+  const logger = getLogger();
+  let lastError: Error | null = null;
+  let delayMs = config.initialDelayMs;
+
+  for (let attempt = 1; attempt <= config.maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (attempt === config.maxAttempts) {
+        logger.error(
+          {
+            error: lastError.message,
+            attempt,
+            maxAttempts: config.maxAttempts,
+          },
+          "All retry attempts exhausted",
+        );
+        break;
+      }
+
+      logger.warn(
+        {
+          error: lastError.message,
+          attempt,
+          maxAttempts: config.maxAttempts,
+          nextRetryDelayMs: delayMs,
+        },
+        "Email send failed, retrying",
+      );
+
+      await sleep(delayMs);
+      delayMs = Math.min(delayMs * config.backoffMultiplier, config.maxDelayMs);
+    }
+  }
+
+  throw lastError;
+}
+
 type ConsoleEmailOptions = {
   logTokens: boolean;
 };
@@ -128,12 +203,14 @@ This verification code will expire in 1 hour.
 If you didn't create an account, you can safely ignore this email.
     `.trim();
 
-    const info = await this.transporter.sendMail({
-      from: this.fromAddress,
-      to,
-      subject,
-      text,
-      html,
+    const info = await withRetry(async () => {
+      return await this.transporter.sendMail({
+        from: this.fromAddress,
+        to,
+        subject,
+        text,
+        html,
+      });
     });
 
     this.logger.info(
@@ -196,12 +273,14 @@ This reset code will expire in 30 minutes.
 If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.
     `.trim();
 
-    const info = await this.transporter.sendMail({
-      from: this.fromAddress,
-      to,
-      subject,
-      text,
-      html,
+    const info = await withRetry(async () => {
+      return await this.transporter.sendMail({
+        from: this.fromAddress,
+        to,
+        subject,
+        text,
+        html,
+      });
     });
 
     this.logger.info(
