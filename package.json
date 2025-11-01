@@ -71,7 +71,7 @@
     "@rollup/rollup-linux-x64-gnu": "4.52.4"
   },
   "devDependencies": {
-    "@types/express": "^5.0.3",
+    "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.7.0",
     "@types/nodemailer": "^7.0.3",
