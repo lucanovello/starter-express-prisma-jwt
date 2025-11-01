@@ -4,7 +4,7 @@ import type { ReqId } from "pino-http";
 
 declare module "express-serve-static-core" {
   interface Request {
-    id?: ReqId;
+    id: ReqId;
     user?: {
       id: string;
       role: Role;
