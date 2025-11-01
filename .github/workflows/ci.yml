@@ -101,10 +101,12 @@ jobs:
         continue-on-error: true
         env:
           TRIVY_FORMAT: table
+          TRIVY_OUTPUT: ""
         with:
           image-ref: starter-app:${{ github.sha }}
           format: table
           severity: CRITICAL,HIGH
+          output: ""
       - name: Fail if vulnerabilities found
         run: |
           trivy image --exit-code 1 --severity CRITICAL,HIGH starter-app:${{ github.sha }}
