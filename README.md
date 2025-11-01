@@ -42,11 +42,11 @@ npm run dev
 
 ## Environment matrix
 
-| Environment               | Entry point                                                                   | Backing services                                             | Notes                                                                                                                                        |
-| ------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local development         | `npm run dev` after `docker compose up -d db`                                 | Postgres 15 via `docker-compose.yml`                         | `.env` (copy from `.env.example`) with relaxed defaults; runs in watch mode.                                                                 |
+| Environment               | Entry point                                                                   | Backing services                                             | Notes                                                                                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local development         | `npm run dev` after `docker compose up -d db`                                 | Postgres 15 via `docker-compose.yml`                         | `.env` (copy from `.env.example`) with relaxed defaults; runs in watch mode.                                                                                    |
 | Continuous integration    | `.github/workflows/ci.yml`                                                    | Postgres 15 service container                                | Workflow runs `npm run typecheck && npm run lint && npm run test:ci` plus OpenAPI build; includes container vulnerability scanning via Trivy; uses `.env.test`. |
-| Production docker compose | `docker compose --env-file .env.production -f compose.prod.yml up -d --build` | App, Postgres, Redis with health checks and ordered start-up | Requires strong JWT secrets, explicit `CORS_ORIGINS`, `RATE_LIMIT_REDIS_URL`, and enables readiness probe via `/ready`.                      |
+| Production docker compose | `docker compose --env-file .env.production -f compose.prod.yml up -d --build` | App, Postgres, Redis with health checks and ordered start-up | Requires strong JWT secrets, explicit `CORS_ORIGINS`, `RATE_LIMIT_REDIS_URL`, and enables readiness probe via `/ready`.                                         |
 
 ### Production compose highlights
 
