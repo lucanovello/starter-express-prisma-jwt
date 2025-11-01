@@ -5,6 +5,7 @@ import "dotenv/config";
 import { ConfigError, getConfig } from "./config/index.js";
 import { getLogger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
+import { registerFatalHandlers } from "./lifecycle/fatalHandlers.js";
 import { beginShutdown } from "./lifecycle/state.js";
 
 const GRACEFUL_TIMEOUT_MS = 10_000;
@@ -25,12 +26,30 @@ async function main() {
   server.headersTimeout = cfg.HTTP_SERVER_HEADERS_TIMEOUT_MS;
   server.requestTimeout = cfg.HTTP_SERVER_REQUEST_TIMEOUT_MS;
 
-  const stopSessionCleanup = scheduleSessionCleanup();
+  let stopSessionCleanup = scheduleSessionCleanup();
+  let shutdownInitiated = false;
+  let forceExitTimer: NodeJS.Timeout | null = null;
+  let detachFatalHandlers: () => void = () => {};
 
-  function onSignal(sig: NodeJS.Signals) {
-    logger.info({ signal: sig }, "Received signal, beginning graceful shutdown");
+  const initiateShutdown = (options: {
+    exitCode: number;
+    source: "signal" | "unhandledRejection" | "uncaughtException";
+    detail?: unknown;
+  }) => {
+    if (shutdownInitiated) {
+      logger.warn({ source: options.source }, "Shutdown already in progress");
+      return;
+    }
+
+    shutdownInitiated = true;
+    detachFatalHandlers();
     beginShutdown();
     stopSessionCleanup();
+    stopSessionCleanup = () => {};
+
+    if (options.source === "signal" && options.detail) {
+      logger.info({ signal: options.detail }, "Received signal, beginning graceful shutdown");
+    }
 
     const cleanup = async () => {
       try {
@@ -45,7 +64,11 @@ async function main() {
       } catch (e) {
         logger.error({ err: e }, "Prisma disconnect error");
       } finally {
-        process.exit(0);
+        if (forceExitTimer) {
+          clearTimeout(forceExitTimer);
+          forceExitTimer = null;
+        }
+        process.exit(options.exitCode);
       }
     };
 
@@ -58,14 +81,23 @@ async function main() {
       void cleanup();
     });
 
-    setTimeout(() => {
+    forceExitTimer = setTimeout(() => {
       logger.error(
-        { timeoutMs: GRACEFUL_TIMEOUT_MS },
+        { timeoutMs: GRACEFUL_TIMEOUT_MS, source: options.source },
         "Graceful shutdown timeout exceeded, forcing exit",
       );
       process.exit(1);
-    }, GRACEFUL_TIMEOUT_MS).unref();
-  }
+    }, GRACEFUL_TIMEOUT_MS);
+    forceExitTimer.unref();
+  };
+
+  detachFatalHandlers = registerFatalHandlers(logger, ({ reason, error }) => {
+    initiateShutdown({ exitCode: 1, source: reason, detail: error });
+  });
+
+  const onSignal = (sig: NodeJS.Signals) => {
+    initiateShutdown({ exitCode: 0, source: "signal", detail: sig });
+  };
 
   process.on("SIGTERM", onSignal);
   process.on("SIGINT", onSignal);
