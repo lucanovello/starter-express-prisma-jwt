@@ -10,7 +10,17 @@ import {
 } from "../dto/auth.js";
 import { AppError } from "../lib/errors.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { validateRequest } from "../middleware/validate.js";
 import * as Auth from "../services/authService.js";
+
+import type {
+  LoginInput,
+  RefreshInput,
+  RegisterInput,
+  RequestPasswordResetInput,
+  ResetPasswordInput,
+  VerifyEmailInput,
+} from "../dto/auth.js";
 
 export const auth = Router();
 
@@ -24,9 +34,9 @@ const requireAccessToken = (req: Request) => {
 };
 
 // Register
-auth.post("/register", async (req, res, next) => {
+auth.post("/register", validateRequest({ body: RegisterSchema }), async (req, res, next) => {
   try {
-    const dto = RegisterSchema.parse(req.body);
+    const dto = req.body as RegisterInput;
     const result = await Auth.register(dto);
     const response: Record<string, unknown> = {
       emailVerificationRequired: result.emailVerificationRequired,
@@ -43,13 +53,12 @@ auth.post("/register", async (req, res, next) => {
 });
 
 // Login
-auth.post("/login", async (req, res, next) => {
+auth.post("/login", validateRequest({ body: LoginSchema }), async (req, res, next) => {
   try {
-    const dto = LoginSchema.parse(req.body);
+    const dto = req.body as LoginInput;
     const ipAddress =
-      (typeof req.ip === "string" && req.ip.length > 0
-        ? req.ip
-        : req.socket?.remoteAddress) ?? "unknown";
+      (typeof req.ip === "string" && req.ip.length > 0 ? req.ip : req.socket?.remoteAddress) ??
+      "unknown";
     const t = await Auth.login(dto, { ipAddress });
     res.status(200).json(t);
   } catch (err) {
@@ -58,9 +67,9 @@ auth.post("/login", async (req, res, next) => {
 });
 
 // Refresh
-auth.post("/refresh", async (req, res, next) => {
+auth.post("/refresh", validateRequest({ body: RefreshSchema }), async (req, res, next) => {
   try {
-    const { refreshToken } = RefreshSchema.parse(req.body);
+    const { refreshToken } = req.body as RefreshInput;
     const t = await Auth.refresh(refreshToken);
     res.status(200).json(t);
   } catch (err) {
@@ -69,9 +78,9 @@ auth.post("/refresh", async (req, res, next) => {
 });
 
 // Logout
-auth.post("/logout", async (req, res, next) => {
+auth.post("/logout", validateRequest({ body: RefreshSchema }), async (req, res, next) => {
   try {
-    const { refreshToken } = RefreshSchema.parse(req.body);
+    const { refreshToken } = req.body as RefreshInput;
     await Auth.logout(refreshToken);
     res.status(204).end();
   } catch (err) {
@@ -80,9 +89,9 @@ auth.post("/logout", async (req, res, next) => {
 });
 
 // Verify email
-auth.post("/verify-email", async (req, res, next) => {
+auth.post("/verify-email", validateRequest({ body: VerifyEmailSchema }), async (req, res, next) => {
   try {
-    const dto = VerifyEmailSchema.parse(req.body);
+    const dto = req.body as VerifyEmailInput;
     await Auth.verifyEmail(dto.token);
     res.status(204).end();
   } catch (err) {
@@ -91,26 +100,34 @@ auth.post("/verify-email", async (req, res, next) => {
 });
 
 // Request password reset
-auth.post("/request-password-reset", async (req, res, next) => {
-  try {
-    const dto = RequestPasswordResetSchema.parse(req.body);
-    await Auth.requestPasswordReset(dto.email);
-    res.status(202).json({ status: "ok" });
-  } catch (err) {
-    next(err);
-  }
-});
+auth.post(
+  "/request-password-reset",
+  validateRequest({ body: RequestPasswordResetSchema }),
+  async (req, res, next) => {
+    try {
+      const dto = req.body as RequestPasswordResetInput;
+      await Auth.requestPasswordReset(dto.email);
+      res.status(202).json({ status: "ok" });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // Reset password
-auth.post("/reset-password", async (req, res, next) => {
-  try {
-    const dto = ResetPasswordSchema.parse(req.body);
-    await Auth.resetPassword(dto);
-    res.status(204).end();
-  } catch (err) {
-    next(err);
-  }
-});
+auth.post(
+  "/reset-password",
+  validateRequest({ body: ResetPasswordSchema }),
+  async (req, res, next) => {
+    try {
+      const dto = req.body as ResetPasswordInput;
+      await Auth.resetPassword(dto);
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // List sessions
 auth.get("/sessions", requireAuth, async (req, res, next) => {

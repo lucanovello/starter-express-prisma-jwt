@@ -1,9 +1,11 @@
 import { Router } from "express";
 
+import { ProtectedUserParamsSchema, type ProtectedUserParams } from "../dto/protected.js";
 import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { requireRole } from "../middleware/requireRole.js";
+import { validateRequest } from "../middleware/validate.js";
 
 export const protectedRoutes = Router();
 
@@ -11,14 +13,20 @@ protectedRoutes.get("/admin/ping", requireAuth, requireRole("ADMIN"), (_req, res
   res.status(200).json({ status: "ok" });
 });
 
-protectedRoutes.get("/users/:userId", requireAuth, async (req, res, next) => {
+protectedRoutes.get(
+  "/users/:userId",
+  requireAuth,
+  validateRequest({ params: ProtectedUserParamsSchema }),
+  async (req, res, next) => {
   try {
     if (!req.user) {
       throw new AppError("Unauthorized", 401, { code: "UNAUTHORIZED" });
     }
 
+    const { userId } = req.params as ProtectedUserParams;
+
     const resource = await prisma.user.findUnique({
-      where: { id: req.params.userId },
+      where: { id: userId },
       select: { id: true, email: true, role: true },
     });
 
@@ -44,4 +52,5 @@ protectedRoutes.get("/users/:userId", requireAuth, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+  },
+);
