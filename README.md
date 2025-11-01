@@ -34,6 +34,8 @@ npx prisma migrate deploy
 npm run dev
 # (Ensure you're using Node 20.x)
 # GET http://localhost:3000/health -> {"status":"ok"}
+# When you need a one-off production-style run:
+# npm start  # (prebuilds automatically and runs node dist/index.js)
 ```
 
 > **First time here?** Check out [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed setup instructions.
@@ -458,7 +460,7 @@ All notable changes are documented in [CHANGELOG.md](./CHANGELOG.md), following 
 
 ## License
 
-This project is licensed under the ISC License - see the [LICENSE](./LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
 ```
 

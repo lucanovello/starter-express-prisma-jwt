@@ -14,6 +14,8 @@
     "pretest:cov": "node scripts/stamp-build-meta.mjs",
     "test:cov": "cross-env TEST_ENV_FILE=.env.test vitest run --coverage",
     "prebuild": "node scripts/stamp-build-meta.mjs",
+    "prestart": "npm run build",
+    "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "openapi:gen": "node scripts/generate-openapi.mjs",
@@ -38,7 +40,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/lucanovello/starter-express-prisma-jwt/issues"
   },
