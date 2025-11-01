@@ -11,9 +11,14 @@ let loggerInstance: pino.Logger | null = null;
 
 /**
  * Get or create the application logger instance.
- * Returns a Pino logger configured based on NODE_ENV.
- * - Production: JSON output
- * - Development: Pretty-printed with pino-pretty
+ * Returns a Pino logger configured based on NODE_ENV and validated LOG_LEVEL.
+ *
+ * @returns {pino.Logger} Singleton logger instance
+ *
+ * @remarks
+ * - Production: JSON output with structured logs
+ * - Development: Pretty-printed with pino-pretty for readability
+ * - Log level is validated and defaults to "info" via config validation
  */
 export function getLogger(): pino.Logger {
   if (loggerInstance) {
@@ -23,7 +28,7 @@ export function getLogger(): pino.Logger {
   const cfg = getConfig();
 
   const baseOptions: pino.LoggerOptions = {
-    level: process.env.LOG_LEVEL || "info",
+    level: cfg.LOG_LEVEL,
     timestamp: pino.stdTimeFunctions.isoTime,
     formatters: {
       level: (label) => ({ level: label }),
