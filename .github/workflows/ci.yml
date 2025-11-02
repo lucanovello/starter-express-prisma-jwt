@@ -73,3 +73,40 @@ jobs:
         uses: docker://rhysd/actionlint:1.7.6
         with:
           args: "-color"
+
+  container-scan:
+    name: Container vulnerability scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t starter-app:${{ github.sha }} .
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: starter-app:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+      - name: Run Trivy vulnerability scanner (table output)
+        uses: aquasecurity/trivy-action@0.30.0
+        continue-on-error: true
+        env:
+          TRIVY_FORMAT: table
+          TRIVY_OUTPUT: ""
+        with:
+          image-ref: starter-app:${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          output: ""
+      - name: Fail if vulnerabilities found
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH starter-app:${{ github.sha }}
