@@ -68,7 +68,9 @@ web_modules/
 # dotenv environment variable files
 .env
 .env.*
+
 !.env.example
+!.env.*.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -141,3 +143,4 @@ vite.config.ts.timestamp-*
 # Generated files
 /src/generated/
 /src/build/meta.ts
+/openapi.json
