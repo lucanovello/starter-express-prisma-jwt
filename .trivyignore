@@ -1,0 +1,5 @@
+# CVE-2024-21538 - ReDoS vulnerability in cross-spawn
+# This is in npm (bundled with Node.js 20.19.0), not application code
+# Will be resolved when Node.js updates to npm with cross-spawn >= 7.0.5
+# See: https://github.com/advisories/GHSA-3xgq-45jj-v275
+CVE-2024-21538
