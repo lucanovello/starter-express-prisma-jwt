@@ -70,6 +70,8 @@ const EnvSchema = z
     JWT_ACCESS_EXPIRY: z.string().default("15m"),
     JWT_REFRESH_EXPIRY: z.string().default("7d"),
     CORS_ORIGINS: z.string().optional(),
+    CORS_ALLOW_CREDENTIALS: z.string().optional(),
+    CORS_MAX_AGE_SECONDS: z.coerce.number().int().nonnegative().default(600),
     TRUST_PROXY: z.string().default("loopback"),
     LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
@@ -184,6 +186,35 @@ const EnvSchema = z
         });
       }
     }
+
+    const emailVerificationRequired = parseBooleanEnv(data.AUTH_EMAIL_VERIFICATION_REQUIRED);
+    if (emailVerificationRequired) {
+      const smtpHost = data.SMTP_HOST?.trim();
+      if (!smtpHost) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SMTP_HOST"],
+          message: "SMTP_HOST is required when AUTH_EMAIL_VERIFICATION_REQUIRED=true",
+        });
+      }
+
+      if (!data.SMTP_PORT) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SMTP_PORT"],
+          message: "SMTP_PORT is required when AUTH_EMAIL_VERIFICATION_REQUIRED=true",
+        });
+      }
+
+      const smtpFrom = data.SMTP_FROM?.trim();
+      if (!smtpFrom) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SMTP_FROM"],
+          message: "SMTP_FROM is required when AUTH_EMAIL_VERIFICATION_REQUIRED=true",
+        });
+      }
+    }
   });
 
 export class ConfigError extends Error {
@@ -194,6 +225,8 @@ export class ConfigError extends Error {
 
 export type AppConfig = z.infer<typeof EnvSchema> & {
   corsOriginsParsed: string[];
+  corsAllowCredentials: boolean;
+  corsMaxAgeSeconds: number;
   metricsEnabled: boolean;
   metricsGuard: MetricsGuardConfig;
   trustProxy: TrustProxySetting;
@@ -237,6 +270,16 @@ export function getConfig(): AppConfig {
   const corsOriginsParsed = splitCommaSeparated(cfg.CORS_ORIGINS);
   const metricsEnabled = parseBooleanEnv(cfg.METRICS_ENABLED);
   const trustProxy = parseTrustProxySetting(cfg.TRUST_PROXY);
+  const allowCredentialsEnv = cfg.CORS_ALLOW_CREDENTIALS;
+  const corsAllowCredentials =
+    cfg.NODE_ENV === "production"
+      ? allowCredentialsEnv
+        ? parseBooleanEnv(allowCredentialsEnv)
+        : false
+      : allowCredentialsEnv
+        ? parseBooleanEnv(allowCredentialsEnv)
+        : true;
+  const corsMaxAgeSeconds = cfg.CORS_MAX_AGE_SECONDS;
   const metricsGuard: MetricsGuardConfig =
     cfg.METRICS_GUARD === "secret"
       ? { type: "secret", secret: cfg.METRICS_GUARD_SECRET!.trim() }
@@ -273,6 +316,8 @@ export function getConfig(): AppConfig {
   cached = {
     ...cfg,
     corsOriginsParsed,
+    corsAllowCredentials,
+    corsMaxAgeSeconds,
     metricsEnabled,
     trustProxy,
     metricsGuard,

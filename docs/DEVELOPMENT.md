@@ -43,7 +43,10 @@ cp .env.example .env
 # Edit .env with your configuration
 # Most defaults work for local development, but you should change:
 # - JWT_ACCESS_SECRET and JWT_REFRESH_SECRET (use strong random strings)
+# - Set CORS_ALLOW_CREDENTIALS=true only if you need cookies during local development (production defaults to false)
 ```
+
+> 🔐 **Security:** Never commit real `.env` files. If secrets were ever pushed, rotate every credential (JWT secrets, DB passwords, metrics guard secrets) before deploying.
 
 **Minimum required changes for local dev:**
 
@@ -52,11 +55,11 @@ JWT_ACCESS_SECRET=your-strong-random-secret-here-min-32-chars
 JWT_REFRESH_SECRET=another-strong-random-secret-here-min-32-chars
 ```
 
-### 3. Start Database
+### 3. Start Database (and optional Redis)
 
 ```bash
-# Start Postgres in Docker
-docker compose up -d db
+# Start Postgres and Redis in Docker (Redis optional for dev)
+docker compose up -d db redis
 
 # Verify it's running
 docker compose ps
@@ -66,7 +69,8 @@ docker compose ps
 # starter-express-...-db-1 postgres:15   Up About a minute
 ```
 
-> Optional: if you want to exercise the Redis-backed rate limiter locally, start the Redis helper container with `docker compose --profile rate-limit up -d redis` and then set `RATE_LIMIT_REDIS_URL=redis://localhost:6379` in your `.env`.
+> If you want to exercise the Redis-backed rate limiter while running the API on your host, set `RATE_LIMIT_REDIS_URL=redis://localhost:6379` in `.env`.
+> If you run the API inside Docker (`docker compose up -d app`), use `RATE_LIMIT_REDIS_URL=redis://redis:6379`.
 
 ### 4. Database Migrations
 
@@ -91,6 +95,24 @@ npm run dev
 # You should see:
 # API listening on http://localhost:3000
 ```
+
+### Alternative: Run the whole dev stack in Docker
+
+```bash
+# Build and start API + Postgres + Redis
+docker compose up -d app
+
+# Tail logs
+docker compose logs -f app
+```
+
+Notes:
+
+- This uses the production-like runner image (no hot reload). Use `npm run dev` on host for watch mode.
+- When the API runs inside Docker, use service DNS names:
+  - `DATABASE_URL=postgres://postgres:postgres@db:5432/starter?schema=public`
+  - `RATE_LIMIT_REDIS_URL=redis://redis:6379`
+- When the API runs on host and only Postgres/Redis are in Docker, use `localhost` in the URLs.
 
 ### 6. Verify Setup
 

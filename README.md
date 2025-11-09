@@ -27,7 +27,7 @@ Minimal, batteries-included REST starter:
 
 ```bash
 cp .env.example .env
-docker compose up -d db
+docker compose up -d db redis
 npm i
 npx prisma generate
 npx prisma migrate deploy
@@ -39,20 +39,25 @@ npm run dev
 ```
 
 > **First time here?** Check out [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed setup instructions.
+> **Security note:** Secrets should never live in version control. If `.env*` files were previously committed, rotate every credential (JWT secrets, database passwords, metrics guard values) before deploying.
+> **Full-stack in Docker:** Prefer `docker compose up -d app` to run API + Postgres + Redis fully containerized. When the API runs inside the compose network use `db` and `redis` service names in your env (`DATABASE_URL=postgres://postgres:postgres@db:5432/starter?schema=public`, `RATE_LIMIT_REDIS_URL=redis://redis:6379`). When running the API on your host, use `localhost` (`postgres://...@localhost:5432/...`, `redis://localhost:6379`).
 
 ## Environment matrix
 
-| Environment               | Entry point                                                                   | Backing services                                             | Notes                                                                                                                                                           |
-| ------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local development         | `npm run dev` after `docker compose up -d db`                                 | Postgres 15 via `docker-compose.yml`                         | `.env` (copy from `.env.example`) with relaxed defaults; runs in watch mode.                                                                                    |
-| Continuous integration    | `.github/workflows/ci.yml`                                                    | Postgres 15 service container                                | Workflow runs `npm run typecheck && npm run lint && npm run test:ci` plus OpenAPI build; includes container vulnerability scanning via Trivy; uses `.env.test`. |
-| Production docker compose | `docker compose --env-file .env.production -f compose.prod.yml up -d --build` | App, Postgres, Redis with health checks and ordered start-up | Requires strong JWT secrets, explicit `CORS_ORIGINS`, `RATE_LIMIT_REDIS_URL`, and enables readiness probe via `/ready`.                                         |
+| Environment                | Entry point                                                                   | Backing services                                             | Notes                                                                                                                                                           |
+| -------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local development (host)   | `npm run dev` after `docker compose up -d db redis`                           | Postgres 15 + optional Redis via `docker-compose.yml`        | `.env` (copy from `.env.example`) with relaxed defaults; Redis optional (in-memory rate limit if unset).                                                        |
+| Local development (docker) | `docker compose up -d app`                                                    | App, Postgres 15, Redis                                      | Containerized dev: use service-name hosts (`db`, `redis`); hot reload not enabled (uses build dist).                                                            |
+| Continuous integration     | `.github/workflows/ci.yml`                                                    | Postgres 15 service container                                | Workflow runs `npm run typecheck && npm run lint && npm run test:ci` plus OpenAPI build; includes container vulnerability scanning via Trivy; uses `.env.test`. |
+| Production docker compose  | `docker compose --env-file .env.production -f compose.prod.yml up -d --build` | App, Postgres, Redis with health checks and ordered start-up | Requires strong JWT secrets, explicit `CORS_ORIGINS`, `RATE_LIMIT_REDIS_URL`, and enables readiness probe via `/ready`.                                         |
 
 ### Production compose highlights
 
 - `compose.prod.yml` builds the `runner` stage from `Dockerfile`, then starts Postgres and Redis with health checks before the API.
 - The API container keeps `npx prisma migrate deploy` as its entrypoint before `node dist/index.js`.
 - Redis is mandatory in production to back rate limiting (`RATE_LIMIT_REDIS_URL`); the container exits unhealthy if Redis fails.
+- Development: you can run the stack entirely via `docker compose up -d app` (API + Postgres + Redis) or run the API on host pointing at compose services (`docker compose up -d db redis`).
+- Inside containers use service DNS names (`db`, `redis`); on host use `localhost`.
 - **Before first deploy**: Copy `.env.production.example` to `.env.production` and replace all placeholder values with strong secrets. Use `openssl rand -base64 32` to generate JWT secrets and metrics secrets.
 - Pass your hardened `.env.production` file via `--env-file` or inject secrets through your orchestrator; `.env` and `.env.production` remain git-ignored.
 - `METRICS_GUARD` and `METRICS_GUARD_SECRET` are now **required** in production when `METRICS_ENABLED=true`; weak defaults have been removed to prevent security misconfigurations.
@@ -109,8 +114,12 @@ Tests use a separate database (`starter_test`) to avoid conflicts with developme
 | JWT_REFRESH_EXPIRY                  | 7d                                                   | default 7d                                                                                             |
 | PORT                                | 3000                                                 | optional                                                                                               |
 | CORS_ORIGINS                        | https://app.example.com                              | comma-separated allowlist, required in production                                                      |
+| CORS_ALLOW_CREDENTIALS              | false                                                | default off in production; enable **only** when you need credentialed cross-origin requests            |
+| CORS_MAX_AGE_SECONDS                | 600                                                  | cache duration for CORS preflight responses                                                            |
 | TRUST_PROXY                         | 1                                                    | Express trust proxy setting (`loopback` default; set to hop count or CIDR list for your load balancer) |
 | RATE_LIMIT_REDIS_URL                | redis://cache:6379                                   | required in production                                                                                 |
+|                                     | redis://localhost:6379                               | host dev URL (API on host, Redis in compose)                                                           |
+|                                     | redis://redis:6379                                   | docker dev URL (API in compose with Redis)                                                             |
 | METRICS_ENABLED                     | false                                                | Enable Prometheus `/metrics`; defaults off in production                                               |
 | METRICS_GUARD                       | secret                                               | Use `secret` (shared header) or `cidr` (IP allowlist) in prod                                          |
 | METRICS_GUARD_SECRET                | prod-metrics-secret                                  | Required when `METRICS_GUARD=secret`; clients send `x-metrics-secret`                                  |
@@ -141,7 +150,10 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 ## CORS
 
 - Production requires `CORS_ORIGINS` (comma-separated). Unknown origins receive `403` with `CORS_ORIGIN_FORBIDDEN`.
-- Local dev/test keep the previous permissive behavior (allowlist optional, same-origin requests without `Origin` header continue to work).
+- Local dev/test keep the previous permissive behavior (allowlist optional, same-origin requests without `Origin` header continue to work). Credentialed requests remain enabled in dev by default.
+- In production, credentialed CORS requests are disabled unless you explicitly set `CORS_ALLOW_CREDENTIALS=true`. Most JWT-based SPA flows do not need this.
+- Responses expose `x-request-id`, `RateLimit-*`, and `Retry-After` headers so clients can reference logs and react to throttling.
+- Preflight responses advertise `Access-Control-Max-Age` (default 600s); adjust via `CORS_MAX_AGE_SECONDS` if your proxy needs different caching.
 - Example: `CORS_ORIGINS=https://app.example.com,https://admin.example.com`
 
 ## Observability
