@@ -44,6 +44,13 @@ export async function registerSecurity(app: Express): Promise<SecurityTeardown> 
   const allowUnknownOrigins = !isProd && allowlist.length === 0;
   const windowMs = cfg.RATE_LIMIT_WINDOW_SEC * 1000;
   const toMax = (rpm: number) => Math.max(1, Math.ceil(rpm * (cfg.RATE_LIMIT_WINDOW_SEC / 60)));
+  const exposedHeaders = [
+    "x-request-id",
+    "RateLimit-Limit",
+    "RateLimit-Remaining",
+    "RateLimit-Reset",
+    "Retry-After",
+  ];
 
   app.use(
     cors((req, cb) => {
@@ -54,17 +61,32 @@ export async function registerSecurity(app: Express): Promise<SecurityTeardown> 
 
       // Allow same-origin / server-to-server / curl with no Origin header
       if (!origin) {
-        return cb(null, { origin: true, credentials: true });
+        return cb(null, {
+          origin: true,
+          credentials: cfg.corsAllowCredentials,
+          exposedHeaders,
+          maxAge: cfg.corsMaxAgeSeconds,
+        });
       }
 
       // Otherwise restrict to the allowlist
       if (allowlist.includes(origin)) {
-        return cb(null, { origin: true, credentials: true });
+        return cb(null, {
+          origin: true,
+          credentials: cfg.corsAllowCredentials,
+          exposedHeaders,
+          maxAge: cfg.corsMaxAgeSeconds,
+        });
       }
 
       if (allowUnknownOrigins) {
         // Preserve existing DX in dev/test with no allowlist specified.
-        return cb(null, { origin: true, credentials: true });
+        return cb(null, {
+          origin: true,
+          credentials: cfg.corsAllowCredentials,
+          exposedHeaders,
+          maxAge: cfg.corsMaxAgeSeconds,
+        });
       }
 
       // Block anything not explicitly allowed

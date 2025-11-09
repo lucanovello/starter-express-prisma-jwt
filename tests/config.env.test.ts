@@ -45,6 +45,10 @@ describe("Environment configuration validation", () => {
     process.env.JWT_REFRESH_SECRET = "b".repeat(32);
 
     expect(() => getConfig()).not.toThrow();
+
+    const cfg = getConfig();
+    expect(cfg.corsAllowCredentials).toBe(true);
+    expect(cfg.corsMaxAgeSeconds).toBe(600);
   });
 
   test("parses boolean environment variables correctly", () => {
@@ -141,5 +145,35 @@ describe("Environment configuration validation", () => {
     expect(config.HTTP_SERVER_HEADERS_TIMEOUT_MS).toBe(60_000);
     expect(config.HTTP_SERVER_KEEPALIVE_TIMEOUT_MS).toBe(5_000);
     expect(config.REQUEST_BODY_LIMIT).toBe("100kb");
+  });
+
+  test("disables credentialed CORS by default in production", () => {
+    process.env.NODE_ENV = "production";
+    process.env.CORS_ORIGINS = "https://app.example.com";
+    process.env.RATE_LIMIT_REDIS_URL = "redis://cache:6379";
+
+    const config = getConfig();
+
+    expect(config.corsAllowCredentials).toBe(false);
+  });
+
+  test("allows opting into credentialed CORS in production", () => {
+    process.env.NODE_ENV = "production";
+    process.env.CORS_ORIGINS = "https://app.example.com";
+    process.env.RATE_LIMIT_REDIS_URL = "redis://cache:6379";
+    process.env.CORS_ALLOW_CREDENTIALS = "true";
+
+    const config = getConfig();
+
+    expect(config.corsAllowCredentials).toBe(true);
+  });
+
+  test("requires SMTP configuration when email verification is mandatory", () => {
+    process.env.AUTH_EMAIL_VERIFICATION_REQUIRED = "true";
+    delete process.env.SMTP_HOST;
+    delete process.env.SMTP_PORT;
+    delete process.env.SMTP_FROM;
+
+    expect(() => getConfig()).toThrow(ConfigError);
   });
 });
