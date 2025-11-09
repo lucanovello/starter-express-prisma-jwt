@@ -14,6 +14,11 @@ async function loadApp() {
 beforeAll(async () => {
   process.env.AUTH_EMAIL_VERIFICATION_REQUIRED = "true";
   process.env.AUTH_EMAIL_VERIFICATION_TTL_MINUTES = "60";
+  // Provide minimal SMTP configuration required when email verification is enabled
+  process.env.SMTP_HOST = "localhost";
+  process.env.SMTP_PORT = "1025";
+  process.env.SMTP_SECURE = "false";
+  process.env.SMTP_FROM = "noreply@example.com";
   vi.resetModules();
   app = await loadApp();
 });
@@ -57,10 +62,7 @@ describe("email verification flow", () => {
       data: { tokenHash: await hashToken(rawToken) },
     });
 
-    await request(app)
-      .post("/auth/verify-email")
-      .send({ token: rawToken })
-      .expect(204);
+    await request(app).post("/auth/verify-email").send({ token: rawToken }).expect(204);
 
     const refreshedUser = await prisma.user.findUniqueOrThrow({
       where: { id: user.id },
@@ -106,10 +108,7 @@ describe("email verification flow", () => {
       },
     });
 
-    const res = await request(app)
-      .post("/auth/verify-email")
-      .send({ token: rawToken })
-      .expect(400);
+    const res = await request(app).post("/auth/verify-email").send({ token: rawToken }).expect(400);
     expect(res.body.error?.code).toBe("EMAIL_VERIFICATION_EXPIRED");
 
     const refreshedUser = await prisma.user.findUniqueOrThrow({
@@ -124,10 +123,7 @@ describe("email verification flow", () => {
 
     await request(app).post("/auth/register").send({ email, password }).expect(201);
 
-    const denied = await request(app)
-      .post("/auth/login")
-      .send({ email, password })
-      .expect(401);
+    const denied = await request(app).post("/auth/login").send({ email, password }).expect(401);
     expect(denied.body.error?.code).toBe("INVALID_CREDENTIALS");
 
     const { prisma } = await import("../src/lib/prisma.js");
@@ -143,15 +139,9 @@ describe("email verification flow", () => {
       data: { tokenHash: await hashToken(rawToken) },
     });
 
-    await request(app)
-      .post("/auth/verify-email")
-      .send({ token: rawToken })
-      .expect(204);
+    await request(app).post("/auth/verify-email").send({ token: rawToken }).expect(204);
 
-    const allowed = await request(app)
-      .post("/auth/login")
-      .send({ email, password })
-      .expect(200);
+    const allowed = await request(app).post("/auth/login").send({ email, password }).expect(200);
     expect(allowed.body.accessToken).toBeDefined();
   });
 });

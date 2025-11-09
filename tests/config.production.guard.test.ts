@@ -85,4 +85,29 @@ describe("production configuration guardrails", () => {
       }
     }
   });
+
+  test("requires SMTP config when email verification is required in production", async () => {
+    vi.resetModules();
+    process.env.NODE_ENV = "production";
+    process.env.CORS_ORIGINS = "https://app.example.com";
+    process.env.RATE_LIMIT_REDIS_URL = "redis://cache:6379";
+    process.env.AUTH_EMAIL_VERIFICATION_REQUIRED = "true";
+    delete process.env.SMTP_HOST;
+    delete process.env.SMTP_PORT;
+    delete process.env.SMTP_FROM;
+
+    const { getConfig, ConfigError } = await import("../src/config/index.js");
+
+    expect(() => getConfig()).toThrow(ConfigError);
+    try {
+      getConfig();
+    } catch (err) {
+      expect(err).toBeInstanceOf(ConfigError);
+      if (err instanceof ConfigError) {
+        expect(err.errors.SMTP_HOST).toBeDefined();
+        expect(err.errors.SMTP_PORT).toBeDefined();
+        expect(err.errors.SMTP_FROM).toBeDefined();
+      }
+    }
+  });
 });
