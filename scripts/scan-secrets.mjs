@@ -1,60 +1,46 @@
 #!/usr/bin/env node
-
 /**
- * Lightweight wrapper to run gitleaks locally with sane defaults that match CI.
- * Prefers a locally installed `gitleaks` binary and falls back to Docker.
- * Pass additional CLI arguments after `--`, e.g. `npm run secrets:scan -- --log-opts main..HEAD`.
+ * Local Gitleaks wrapper with two modes:
+ *  - history scan (default):  gitleaks detect ... [--log-opts <range>]
+ *  - staged scan:             gitleaks protect --staged ...
  */
-
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 
-const args = process.argv.slice(2);
-
-const baseArgs = [
-  "detect",
-  "--source",
-  ".",
-  "--no-banner",
-  "--redact",
-  "--exit-code",
-  "1",
-];
-
-const logOpts = process.env.GITLEAKS_LOG_OPTS;
-if (logOpts && logOpts.trim().length > 0) {
-  baseArgs.push("--log-opts", logOpts.trim());
+const argv = process.argv.slice(2);
+let mode = "detect";
+const idx = argv.findIndex((a) => a === "--mode=protect-staged");
+if (idx !== -1) {
+  mode = "protect-staged";
+  argv.splice(idx, 1);
 }
 
-const finalArgs = [...baseArgs, ...args];
-
-function hasBinary(binaryName) {
-  const command = process.platform === "win32" ? "where" : "which";
-  const lookup = spawnSync(command, [binaryName], {
-    stdio: "ignore",
-    shell: false,
-  });
-  return lookup.status === 0;
+function has(bin) {
+  const cmd = process.platform === "win32" ? "where" : "which";
+  return spawnSync(cmd, [bin], { stdio: "ignore" }).status === 0;
+}
+function run(cmd, args) {
+  return spawnSync(cmd, args, { stdio: "inherit", env: process.env }).status ?? 1;
 }
 
-function runCommand(command, commandArgs) {
-  const run = spawnSync(command, commandArgs, {
-    stdio: "inherit",
-    shell: false,
-    env: process.env,
-  });
-  return run.status ?? 1;
+function buildArgs() {
+  const common = ["--no-banner", "--redact", "--exit-code", "1"];
+  if (mode === "protect-staged") return ["protect", "--staged", ...common];
+  const args = ["detect", "--source", ".", ...common];
+  const logOpts = process.env.GITLEAKS_LOG_OPTS;
+  if (logOpts && logOpts.trim()) args.push("--log-opts", logOpts.trim());
+  return args;
 }
+const finalArgs = [...buildArgs(), ...argv];
 
-if (hasBinary("gitleaks")) {
-  process.exit(runCommand("gitleaks", finalArgs));
-}
+if (has("gitleaks")) process.exit(run("gitleaks", finalArgs));
 
-const dockerBinary = process.platform === "win32" ? "docker.exe" : "docker";
-if (hasBinary(dockerBinary)) {
+const docker = process.platform === "win32" ? "docker.exe" : "docker";
+if (has(docker)) {
   const workspace = path.resolve(process.cwd());
-  const dockerArgs = [
+  const mapped = finalArgs.map((a) => (a === "." ? "/repo" : a));
+  const dargs = [
     "run",
     "--rm",
     "-v",
@@ -62,16 +48,10 @@ if (hasBinary(dockerBinary)) {
     "-w",
     "/repo",
     "zricethezav/gitleaks:v8.24.3",
-    ...finalArgs.map((arg) => (arg === "." ? "/repo" : arg)),
+    ...mapped,
   ];
-
-  process.exit(runCommand(dockerBinary, dockerArgs));
+  process.exit(run(docker, dargs));
 }
 
-console.error(
-  [
-    "gitleaks binary not found and Docker is unavailable.",
-    "Install gitleaks (https://github.com/gitleaks/gitleaks/releases) or install Docker to run via container.",
-  ].join(" "),
-);
+console.error("gitleaks not found and Docker unavailable.");
 process.exit(127);

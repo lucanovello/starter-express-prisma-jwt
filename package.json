@@ -27,8 +27,10 @@
     "pretest:ci": "node scripts/stamp-build-meta.mjs",
     "test:ci": "cross-env TEST_ENV_FILE=.env.test vitest run --coverage",
     "secrets:scan": "node scripts/scan-secrets.mjs",
+    "secrets:scan:staged": "node scripts/scan-secrets.mjs --mode=protect-staged",
     "check": "npm run typecheck && npm run lint && npm run secrets:scan && npm run test",
-    "check:commit": "npm run typecheck && npm run lint && npm run secrets:scan",
+    "check:commit": "npm run typecheck && npm run lint && npm run secrets:scan:staged",
+    "check:local": "cross-env GITLEAKS_LOG_OPTS=origin/main..HEAD npm run typecheck && npm run lint && npm run secrets:scan && npm run test",
     "check:cov": "npm run typecheck && npm run lint && npm run secrets:scan && npm run test:ci"
   },
   "engines": {
