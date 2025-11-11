@@ -41,8 +41,16 @@ jobs:
           node-version: 20.19.0
           cache: npm
       - run: npm ci
-      - name: Secret scanning
-        run: npm run secrets:scan
+      - name: Compute GITLEAKS_LOG_OPTS
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "GITLEAKS_LOG_OPTS=--all ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" >> "$GITHUB_ENV"
+          else
+            # push (or anything else)
+            echo "GITLEAKS_LOG_OPTS=--all ${{ github.event.before }}..${{ github.sha }}" >> "$GITHUB_ENV"
+          fi
+      - name: Secret scanning (range-scoped)
+        run: npm run secrets:scan -- --report-format json --report-path .gitleaks.report.json
       - name: Dependency vulnerability audit
         run: npm run audit:ci
       - name: Prisma migrate & generate
