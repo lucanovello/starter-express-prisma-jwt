@@ -1,4 +1,4 @@
-﻿# Starter: Express + Prisma + JWT
+# Starter: Express + Prisma + JWT
 
 [![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
 
@@ -8,6 +8,7 @@ Minimal, batteries-included REST starter:
 - Prisma/Postgres sessions
 - Pino logs with `x-request-id`
 - Liveness `/health` and readiness `/ready`
+- Response compression + cache headers on metadata endpoints
 - CI: Vitest + coverage artifact, container vulnerability scanning
 
 ## Table of Contents
@@ -100,8 +101,8 @@ Tests use a separate database (`starter_test`) to avoid conflicts with developme
 
 ## Health
 
-- `GET /health` â†’ `200 {"status":"ok"}`
-- `GET /ready` â†’ `200 {"status":"ready"}` when DB responds, else `503 {"error":{"message":"Not Ready","code":"NOT_READY"}}`
+- `GET /health` -> `200 {"status":"ok"}`
+- `GET /ready` -> `200 {"status":"ready"}` when DB (and Redis when configured) respond, else `503 {"error":{"message":"Not Ready","code":"NOT_READY"}}` or `503 {"error":{"message":"Redis not ready","code":"REDIS_NOT_READY"}}`
 
 ## Env
 
@@ -131,9 +132,13 @@ Tests use a separate database (`starter_test`) to avoid conflicts with developme
 | AUTH_LOGIN_LOCKOUT_MINUTES          | 15                                                   | Lockout duration (minutes)                                                                             |
 | AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES   | 15                                                   | Rolling window for counting login attempts (minutes)                                                   |
 | REQUEST_BODY_LIMIT                  | 100kb                                                | optional override for express.json()                                                                   |
+| RESPONSE_COMPRESSION_ENABLED        | true                                                 | toggle gzip compression for JSON/text responses                                                        |
+| RESPONSE_COMPRESSION_MIN_BYTES      | 1024                                                 | minimum payload size (bytes) before compression is attempted                                           |
 | HTTP_SERVER_REQUEST_TIMEOUT_MS      | 30000                                                | optional override, default 30s                                                                         |
 | HTTP_SERVER_HEADERS_TIMEOUT_MS      | 60000                                                | optional override, default 60s                                                                         |
 | HTTP_SERVER_KEEPALIVE_TIMEOUT_MS    | 5000                                                 | optional override, default 5s                                                                          |
+
+Note: Example values are placeholders only. URLs use reserved domains and IP ranges (e.g., example.com, 203.0.113.0/24). No real credentials are stored in git.
 
 ## Run in Docker (prod-like)
 
@@ -162,6 +167,11 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 - Common series: `http_requests_total`, `http_request_duration_seconds`, Node process metrics.
 - Version: `GET /version` returns `{ version, gitSha, buildTime }` from the build stamp.
 
+## Responses
+
+- JSON/text responses are compressed (gzip) once they exceed `RESPONSE_COMPRESSION_MIN_BYTES`; disable via `RESPONSE_COMPRESSION_ENABLED=false` when proxies handle compression upstream.
+- `/openapi.json` and `/version` emit `Cache-Control: public, max-age=300, stale-while-revalidate=60` so load balancers and CDNs can cache slow-changing metadata without delaying auth-enabled endpoints.
+
 ## Logging
 
 - Structured Pino logs include a per-request `x-request-id`.
@@ -170,6 +180,7 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 ## Rate limiting + timeouts
 
 - Redis is required for rate-limit persistence in production (`RATE_LIMIT_REDIS_URL`).
+- `/ready` fails fast with `REDIS_NOT_READY` when Redis is configured but unreachable, preventing traffic from bypassing rate limits and lockouts.
 - Local development defaults to in-memory throttling. Uncomment `RATE_LIMIT_REDIS_URL` after starting the optional Redis container (e.g. `docker compose --profile rate-limit up -d redis`) if you want to exercise the Redis-backed path.
 - Express trusts proxy headers via `TRUST_PROXY`. The default `loopback` works for local dev; set it to the number of proxy hops (e.g. `1`) or a CIDR list that matches your ingress so rate limiting and CIDR guards see the real client IP.
 - Memory stores are only used in dev/test. Misconfiguration fails fast on boot.
@@ -479,3 +490,4 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 ```
 
 ```
+

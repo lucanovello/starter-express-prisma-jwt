@@ -144,3 +144,4 @@ vite.config.ts.timestamp-*
 /src/generated/
 /src/build/meta.ts
 /openapi.json
+.gitleaks.report.json

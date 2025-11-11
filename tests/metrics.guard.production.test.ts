@@ -54,8 +54,8 @@ const prepareBaseEnv = () => {
   process.env.CORS_ORIGINS = "https://app.example.com";
   process.env.RATE_LIMIT_REDIS_URL = "redis://fake-host:6379";
   process.env.TRUST_PROXY = "loopback";
-  process.env.JWT_ACCESS_SECRET = "prod-access-secret-0123456789abcdef";
-  process.env.JWT_REFRESH_SECRET = "prod-refresh-secret-fedcba9876543210";
+  process.env.JWT_ACCESS_SECRET = "prod_access_secret_for_tests_only";
+  process.env.JWT_REFRESH_SECRET = "prod_refresh_secret_for_tests_only";
   process.env.JWT_ACCESS_EXPIRY = "15m";
   process.env.JWT_REFRESH_EXPIRY = "7d";
   delete process.env.METRICS_GUARD_SECRET;
