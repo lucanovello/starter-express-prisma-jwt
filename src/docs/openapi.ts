@@ -347,6 +347,10 @@ registry.registerPath({
               summary: "Dependency not ready",
               value: { error: { message: "Not Ready", code: "NOT_READY" } },
             },
+            redisUnavailable: {
+              summary: "Redis dependency not ready",
+              value: { error: { message: "Redis not ready", code: "REDIS_NOT_READY" } },
+            },
           },
         },
       },

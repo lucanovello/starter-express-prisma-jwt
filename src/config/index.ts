@@ -106,6 +106,8 @@ const EnvSchema = z
     AUTH_LOGIN_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
     AUTH_LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
     AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES: z.coerce.number().int().positive().default(15),
+    RESPONSE_COMPRESSION_ENABLED: z.string().optional(),
+    RESPONSE_COMPRESSION_MIN_BYTES: z.coerce.number().int().nonnegative().default(1024),
   })
   .superRefine((data, ctx) => {
     if (data.METRICS_GUARD === "secret") {
@@ -231,6 +233,10 @@ export type AppConfig = z.infer<typeof EnvSchema> & {
   metricsGuard: MetricsGuardConfig;
   trustProxy: TrustProxySetting;
   rateLimitStore: RateLimitStoreConfig;
+  responseCompression: {
+    enabled: boolean;
+    minBytes: number;
+  };
   smtp: {
     host: string | undefined;
     port: number | undefined;
@@ -313,6 +319,12 @@ export function getConfig(): AppConfig {
     loginAttemptWindowMs: cfg.AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES * 60 * 1000,
   };
 
+  const compressionEnabledEnv = cfg.RESPONSE_COMPRESSION_ENABLED;
+  const responseCompression = {
+    enabled: compressionEnabledEnv ? parseBooleanEnv(compressionEnabledEnv) : true,
+    minBytes: cfg.RESPONSE_COMPRESSION_MIN_BYTES,
+  };
+
   cached = {
     ...cfg,
     corsOriginsParsed,
@@ -322,6 +334,7 @@ export function getConfig(): AppConfig {
     trustProxy,
     metricsGuard,
     rateLimitStore,
+    responseCompression,
     smtp,
     auth,
   };

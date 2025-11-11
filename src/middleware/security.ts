@@ -12,6 +12,10 @@ import { createClient } from "redis";
 
 import { getConfig } from "../config/index.js";
 import { AppError } from "../lib/errors.js";
+import {
+  markRateLimitRedisHealthy,
+  markRateLimitRedisUnhealthy,
+} from "../lib/rateLimitHealth.js";
 
 import type { Express, Request, RequestHandler } from "express";
 
@@ -100,14 +104,50 @@ export async function registerSecurity(app: Express): Promise<SecurityTeardown> 
 
   let globalStore: RedisStore | undefined;
   let authStore: RedisStore | undefined;
-  const redisClients: RedisClient[] = [];
+  const redisClients: Array<{ client: RedisClient; teardown: () => void }> = [];
 
   if (cfg.rateLimitStore.type === "redis") {
     // In test environments we deliberately avoid connecting to Redis to keep tests hermetic and fast.
     // With store undefined, express-rate-limit falls back to in-memory store. In production, a Redis store is required.
     if (cfg.NODE_ENV !== "test") {
       const client = await connectRedisClient(cfg.rateLimitStore.url);
-      redisClients.push(client);
+      const handleReady = () => {
+        markRateLimitRedisHealthy();
+      };
+      const handleEnd = () => {
+        markRateLimitRedisUnhealthy("Redis connection closed");
+      };
+      const handleReconnecting = () => {
+        markRateLimitRedisUnhealthy("Redis reconnecting");
+      };
+      const handleError = (error: unknown) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        markRateLimitRedisUnhealthy(reason);
+      };
+
+      const anyClient: any = client as any;
+      const hasEventApi = typeof anyClient?.on === "function";
+      if (hasEventApi) {
+        anyClient.on("ready", handleReady);
+        anyClient.on("end", handleEnd);
+        anyClient.on("reconnecting", handleReconnecting);
+        anyClient.on("error", handleError);
+      }
+
+      const removeListeners = () => {
+        anyClient?.off?.("ready", handleReady);
+        anyClient?.off?.("end", handleEnd);
+        anyClient?.off?.("reconnecting", handleReconnecting);
+        anyClient?.off?.("error", handleError);
+        anyClient?.removeListener?.("ready", handleReady);
+        anyClient?.removeListener?.("end", handleEnd);
+        anyClient?.removeListener?.("reconnecting", handleReconnecting);
+        anyClient?.removeListener?.("error", handleError);
+      };
+
+      redisClients.push({ client, teardown: removeListeners });
+
+      markRateLimitRedisHealthy();
       const sendCommand: SendCommandFn = (...args) =>
         client.sendCommand(args) as ReturnType<SendCommandFn>;
 
@@ -156,7 +196,12 @@ export async function registerSecurity(app: Express): Promise<SecurityTeardown> 
 
   const teardown: SecurityTeardown = async () => {
     await Promise.all(
-      redisClients.map(async (client) => {
+      redisClients.map(async ({ client, teardown }) => {
+        try {
+          teardown();
+        } catch {
+          // Listener cleanup shouldn't block shutdown.
+        }
         try {
           await client.disconnect();
         } catch {
