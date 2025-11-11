@@ -138,6 +138,8 @@ Tests use a separate database (`starter_test`) to avoid conflicts with developme
 | HTTP_SERVER_HEADERS_TIMEOUT_MS      | 60000                                                | optional override, default 60s                                                                         |
 | HTTP_SERVER_KEEPALIVE_TIMEOUT_MS    | 5000                                                 | optional override, default 5s                                                                          |
 
+Note: Example values are placeholders only. URLs use reserved domains and IP ranges (e.g., example.com, 203.0.113.0/24). No real credentials are stored in git.
+
 ## Run in Docker (prod-like)
 
 ```bash

@@ -26,8 +26,8 @@ beforeEach(async () => {
   for (const key of REQUIRED_ENV) {
     ORIGINAL_ENV[key] = process.env[key];
   }
-  process.env.JWT_ACCESS_SECRET = "0123456789abcdef0123456789abcdef";
-  process.env.JWT_REFRESH_SECRET = "fedcba9876543210fedcba9876543210";
+  process.env.JWT_ACCESS_SECRET = "test_jwt_access_secret_32_chars_min";
+  process.env.JWT_REFRESH_SECRET = "test_jwt_refresh_secret_32_chars_min";
   process.env.JWT_ACCESS_EXPIRY ??= "15m";
   process.env.JWT_REFRESH_EXPIRY ??= "7d";
   process.env.CORS_ORIGINS = "http://localhost";

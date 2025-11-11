@@ -10,3 +10,9 @@
 # Historical test fixture secrets in tests/rateLimit.redis.test.ts
 338aac142de697d5c414572f4529ec735f7952c9:tests/rateLimit.redis.test.ts:generic-api-key:192
 338aac142de697d5c414572f4529ec735f7952c9:tests/rateLimit.redis.test.ts:generic-api-key:193
+
+# Historical test fixture secrets introduced during compression/readiness PR
+ae8f03496ede8c4f26624e3aa0130b5141f34a35:tests/compression.cache.test.ts:generic-api-key:26
+ae8f03496ede8c4f26624e3aa0130b5141f34a35:tests/compression.cache.test.ts:generic-api-key:27
+ae8f03496ede8c4f26624e3aa0130b5141f34a35:tests/ready.redis.test.ts:generic-api-key:29
+ae8f03496ede8c4f26624e3aa0130b5141f34a35:tests/ready.redis.test.ts:generic-api-key:30
