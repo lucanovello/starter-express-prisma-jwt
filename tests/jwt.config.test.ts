@@ -8,8 +8,8 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 const OLD_ENV = { ...process.env };
-const STRONG_ACCESS_SECRET = "0123456789abcdef0123456789abcdef";
-const STRONG_REFRESH_SECRET = "fedcba9876543210fedcba9876543210";
+const STRONG_ACCESS_SECRET = "test_jwt_access_secret_32_chars_min";
+const STRONG_REFRESH_SECRET = "test_jwt_refresh_secret_32_chars_min";
 
 beforeAll(() => {
   process.env.JWT_ACCESS_SECRET = STRONG_ACCESS_SECRET;

@@ -48,7 +48,7 @@ export function assertSafeTestDatabaseUrl(databaseUrl: string | undefined) {
 
 assertSafeTestDatabaseUrl(process.env.DATABASE_URL);
 
-process.env.JWT_ACCESS_SECRET ??= "0123456789abcdef0123456789abcdef";
-process.env.JWT_REFRESH_SECRET ??= "fedcba9876543210fedcba9876543210";
+process.env.JWT_ACCESS_SECRET ??= "test_jwt_access_secret_32_chars_minimum";
+process.env.JWT_REFRESH_SECRET ??= "test_jwt_refresh_secret_32_chars_minimum";
 process.env.JWT_ACCESS_EXPIRY ??= "15m";
 process.env.JWT_REFRESH_EXPIRY ??= "30d";

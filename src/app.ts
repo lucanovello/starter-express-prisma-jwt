@@ -2,6 +2,7 @@
  * App composition (no .listen() here).
  * WHY: Tests import the app directly (Supertest) without opening a TCP port.
  */
+import compression from "compression";
 import express, {
   type Request,
   type Response,
@@ -18,6 +19,7 @@ import { BUILD_VERSION, BUILD_GIT_SHA, BUILD_TIME } from "./build/meta.js";
 import { getConfig, type AppConfig, type MetricsGuardConfig } from "./config/index.js";
 import openapi from "./docs/openapi.js";
 import { prisma } from "./lib/prisma.js";
+import { getRateLimitRedisHealth } from "./lib/rateLimitHealth.js";
 import { isShuttingDown } from "./lifecycle/state.js";
 import { metricsMiddleware, metricsHandler } from "./metrics/index.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -35,6 +37,15 @@ let securityTeardown: SecurityTeardown | null = null;
 type NodeEnv = AppConfig["NODE_ENV"];
 
 const METRICS_SECRET_HEADER = "x-metrics-secret";
+const SLOW_CACHE_MAX_AGE_SECONDS = 300;
+const SLOW_CACHE_STALE_SECONDS = 60;
+
+const cacheSlowChangingResponse = (res: Response): void => {
+  res.setHeader(
+    "Cache-Control",
+    `public, max-age=${SLOW_CACHE_MAX_AGE_SECONDS}, stale-while-revalidate=${SLOW_CACHE_STALE_SECONDS}`,
+  );
+};
 
 const createMetricsGuard = (env: NodeEnv, guard: MetricsGuardConfig): RequestHandler[] => {
   const respondForbidden = (res: Response) =>
@@ -202,6 +213,43 @@ app.use(echoRequestId);
 const jsonParser = express.json({ limit: cfg.REQUEST_BODY_LIMIT }) as unknown as RequestHandler;
 app.use(jsonParser);
 
+if (cfg.responseCompression.enabled) {
+  const isCompressibleHeader = (value: string): boolean => {
+    const normalized = value.toLowerCase();
+    return (
+      normalized.includes("application/json") ||
+      normalized.startsWith("text/") ||
+      normalized.includes("application/javascript") ||
+      normalized.includes("application/xml")
+    );
+  };
+
+  const jsonTextCompressionFilter: compression.CompressionFilter = (req, res) => {
+    if (!compression.filter(req, res)) {
+      return false;
+    }
+
+    const header = res.getHeader("Content-Type");
+    if (Array.isArray(header)) {
+      return header.some((value) => typeof value === "string" && isCompressibleHeader(value));
+    }
+    if (typeof header === "string") {
+      return isCompressibleHeader(header);
+    }
+    if (typeof header === "number") {
+      return false;
+    }
+    return true;
+  };
+
+  app.use(
+    compression({
+      threshold: cfg.responseCompression.minBytes,
+      filter: jsonTextCompressionFilter,
+    }),
+  );
+}
+
 // Security baseline (helmet, CORS, rate limit, etc.)
 securityTeardown = await registerSecurity(app);
 
@@ -230,14 +278,26 @@ app.get("/ready", async (_req, res) => {
   try {
     // Keep your existing DB health check here
     await prisma.$queryRaw`SELECT 1`;
-    return res.json({ status: "ready" });
   } catch {
     return res.status(503).json({ error: { message: "Not Ready", code: "NOT_READY" } });
   }
+
+  const redisRequired = cfg.rateLimitStore.type === "redis" && cfg.NODE_ENV !== "test";
+  if (redisRequired) {
+    const redisHealth = getRateLimitRedisHealth();
+    if (redisHealth.status !== "ready") {
+      return res
+        .status(503)
+        .json({ error: { message: "Redis not ready", code: "REDIS_NOT_READY" } });
+    }
+  }
+
+  return res.json({ status: "ready" });
 });
 
 // Build metadata
 app.get("/version", (_req: Request, res: Response) => {
+  cacheSlowChangingResponse(res);
   res.json({
     version: BUILD_VERSION,
     gitSha: BUILD_GIT_SHA,
@@ -251,7 +311,10 @@ app.use("/protected", protectedRoutes);
 
 // API docs
 // Serve OpenAPI spec as JSON
-app.get("/openapi.json", (_req, res) => res.json(openapi));
+app.get("/openapi.json", (_req, res) => {
+  cacheSlowChangingResponse(res);
+  res.json(openapi);
+});
 
 // Serve Swagger UI only in non-production environments
 const shouldExposeDocs = cfg.NODE_ENV !== "production";
