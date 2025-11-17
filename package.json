@@ -72,6 +72,7 @@
     "@rollup/rollup-linux-x64-gnu": "4.52.4"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@types/compression": "^1.7.5",
     "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
@@ -85,7 +86,7 @@
     "audit-ci": "^7.1.0",
     "cross-env": "^10.1.0",
     "dotenv-cli": "^10.0.0",
-    "eslint": "^9.38.0",
+    "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
@@ -99,5 +100,11 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "js-yaml": "4.1.1",
+    "@eslint/eslintrc": {
+      "js-yaml": "4.1.1"
+    }
   }
 }
