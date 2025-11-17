@@ -65,13 +65,10 @@ describe("session management", () => {
       .send({ refreshToken })
       .expect(401);
 
-    const relist = await request(app)
+    await request(app)
       .get("/auth/sessions")
       .set("Authorization", `Bearer ${accessToken}`)
-      .expect(200);
-    relist.body.sessions.forEach((session: any) => {
-      expect(session.valid).toBe(false);
-    });
+      .expect(401);
   });
 
   test("requires authorization header for session routes", async () => {

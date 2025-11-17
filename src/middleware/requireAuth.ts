@@ -42,7 +42,7 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
       }
 
       if (!session.valid) {
-        attachedSessionId = null;
+        throw new AppError("Invalid session", 401, { code: "SESSION_INVALID" });
       }
     }
 
