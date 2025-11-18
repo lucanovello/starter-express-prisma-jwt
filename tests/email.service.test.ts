@@ -84,7 +84,7 @@ describe("Email Service", () => {
     expect(loggerWarnSpy).toHaveBeenCalled();
     // No logged argument should contain the raw token string
     const includesToken = [...loggerInfoSpy.mock.calls, ...loggerWarnSpy.mock.calls].some((call) =>
-      call.some((arg) => {
+      call.some((arg: string | string[]) => {
         if (typeof arg === "string") return arg.includes(token);
         if (arg && typeof arg === "object") {
           try {
@@ -99,7 +99,7 @@ describe("Email Service", () => {
     expect(includesToken).toBe(false);
 
     const metaCall = loggerInfoSpy.mock.calls.find(
-      (call) => call[0]?.emailType === "password-reset",
+      (call: { emailType: string }[]) => call[0]?.emailType === "password-reset",
     );
     expect(metaCall?.[0]).toMatchObject({
       emailType: "password-reset",

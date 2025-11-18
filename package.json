@@ -10,7 +10,7 @@
     "postinstall": "prisma generate",
     "pretest": "node scripts/stamp-build-meta.mjs",
     "test": "cross-env TEST_ENV_FILE=.env.test vitest run",
-    "audit:ci": "audit-ci --moderate",
+    "audit:ci": "audit-ci --config ./audit-ci.jsonc",
     "pretest:cov": "node scripts/stamp-build-meta.mjs",
     "test:cov": "cross-env TEST_ENV_FILE=.env.test vitest run --coverage",
     "prebuild": "node scripts/stamp-build-meta.mjs",
@@ -82,7 +82,7 @@
     "@types/swagger-ui-express": "^4.1.8",
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/coverage-v8": "^4.0.10",
     "audit-ci": "^7.1.0",
     "cross-env": "^10.1.0",
     "dotenv-cli": "^10.0.0",
@@ -99,7 +99,7 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.10"
   },
   "overrides": {
     "js-yaml": "4.1.1",

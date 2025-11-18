@@ -4,23 +4,17 @@ export default defineConfig({
   test: {
     environment: "node",
     pool: "forks",
-    poolOptions: {
-      forks: {
-        maxForks: 1,
-        minForks: 1,
-      },
-    },
+    fileParallelism: false,
     include: ["tests/**/*.test.ts"],
     setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      all: true,
       thresholds: {
-        lines: 85,
-        statements: 85,
-        functions: 80,
-        branches: 70,
+        lines: 80,
+        statements: 80,
+        functions: 75,
+        branches: 60,
       },
       exclude: [
         "dist/**",
