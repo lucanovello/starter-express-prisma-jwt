@@ -1,4 +1,4 @@
-import { Router, type Request } from "express";
+import { Router } from "express";
 
 import {
   LoginSchema,
@@ -23,15 +23,6 @@ import type {
 } from "../dto/auth.js";
 
 export const auth = Router();
-
-const requireAccessToken = (req: Request) => {
-  const header = req.headers.authorization ?? "";
-  if (!header.startsWith("Bearer ")) {
-    throw new AppError("Unauthorized", 401, { code: "UNAUTHORIZED" });
-  }
-  const token = header.slice(7);
-  return Auth.authenticateAccessToken(token);
-};
 
 // Register
 auth.post("/register", validateRequest({ body: RegisterSchema }), async (req, res, next) => {

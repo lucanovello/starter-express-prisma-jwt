@@ -320,8 +320,8 @@ export async function login(input: { email: string; password: string }, context:
 
   await ensureLoginNotLocked(emailLowercase, ipAddress, auth);
 
-  const user = await prisma.user.findFirst({
-    where: { email: { equals: input.email, mode: "insensitive" } },
+  const user = await prisma.user.findUnique({
+    where: { email: emailLowercase },
   });
 
   if (!user) {
