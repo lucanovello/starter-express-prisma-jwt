@@ -27,7 +27,7 @@
     "pretest:ci": "node scripts/stamp-build-meta.mjs",
     "test:ci": "cross-env TEST_ENV_FILE=.env.test vitest run --coverage",
     "secrets:scan": "node scripts/scan-secrets.mjs",
-    "check": "npm run typecheck && npm run lint && npm run secrets:scan && npm run test",
+    "check": "npm run typecheck && npm run lint && npm run secrets:scan && npm run audit:ci && npm run test",
     "check:commit": "npm run typecheck && npm run lint && npm run secrets:scan",
     "check:cov": "npm run typecheck && npm run lint && npm run secrets:scan && npm run test:ci"
   },
