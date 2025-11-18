@@ -19,6 +19,24 @@ test("register 400 on invalid email", async () => {
   expect(r.body.error.code).toBe("VALIDATION");
 });
 
+test("register accepts password with required complexity", async () => {
+  await resetDb();
+  const email = `strong_${Date.now()}@example.com`;
+  const password = "Stronger1!";
+  const r = await request(app).post("/auth/register").send({ email, password });
+  expect(r.status).toBe(201);
+  expect(r.body.accessToken).toBeDefined();
+  expect(r.body.refreshToken).toBeDefined();
+});
+
+test("register 400 on weak password", async () => {
+  const r = await request(app)
+    .post("/auth/register")
+    .send({ email: "weak@example.com", password: "alllower" });
+  expect(r.status).toBe(400);
+  expect(r.body.error.code).toBe("VALIDATION");
+});
+
 test("login 400 on missing password", async () => {
   const r = await request(app).post("/auth/login").send({ email: "a@b.c" });
   expect(r.status).toBe(400);

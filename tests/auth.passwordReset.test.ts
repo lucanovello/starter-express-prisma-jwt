@@ -35,10 +35,7 @@ describe("password reset flow", () => {
     const email = uniqueEmail("reset");
     const password = "Passw0rd!";
 
-    await request(app)
-      .post("/auth/register")
-      .send({ email, password })
-      .expect(201);
+    await request(app).post("/auth/register").send({ email, password }).expect(201);
 
     const known = await request(app)
       .post("/auth/request-password-reset")
@@ -88,15 +85,9 @@ describe("password reset flow", () => {
       .expect(204);
 
     const refresh = register.body.refreshToken as string;
-    await request(app)
-      .post("/auth/refresh")
-      .send({ refreshToken: refresh })
-      .expect(401);
+    await request(app).post("/auth/refresh").send({ refreshToken: refresh }).expect(401);
 
-    const loginOld = await request(app)
-      .post("/auth/login")
-      .send({ email, password })
-      .expect(401);
+    const loginOld = await request(app).post("/auth/login").send({ email, password }).expect(401);
     expect(loginOld.body.error?.code).toBe("INVALID_CREDENTIALS");
 
     const loginNew = await request(app)
@@ -106,14 +97,41 @@ describe("password reset flow", () => {
     expect(loginNew.body.accessToken).toBeDefined();
   });
 
+  test("reset password rejects weak password", async () => {
+    const email = uniqueEmail("reset-weak");
+    const password = "Passw0rd!";
+
+    await request(app).post("/auth/register").send({ email, password }).expect(201);
+
+    const { prisma } = await import("../src/lib/prisma.js");
+    const { hashToken } = await import("../src/lib/tokenHash.js");
+
+    const user = await prisma.user.findFirstOrThrow({
+      where: { email: email.toLowerCase() },
+    });
+
+    const rawToken = `weak-${user.id}`;
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: await hashToken(rawToken),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    const res = await request(app)
+      .post("/auth/reset-password")
+      .send({ token: rawToken, password: "alllower" })
+      .expect(400);
+
+    expect(res.body.error?.code).toBe("VALIDATION");
+  });
+
   test("rejects expired and already used reset tokens", async () => {
     const email = uniqueEmail("reset-expired");
     const password = "Passw0rd!";
 
-    await request(app)
-      .post("/auth/register")
-      .send({ email, password })
-      .expect(201);
+    await request(app).post("/auth/register").send({ email, password }).expect(201);
 
     const { prisma } = await import("../src/lib/prisma.js");
     const { hashToken } = await import("../src/lib/tokenHash.js");
