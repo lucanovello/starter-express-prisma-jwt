@@ -78,6 +78,14 @@ npm run check
 
 **Note:** Tests automatically use `.env.test` configuration. If you need to customize test environment variables, copy `.env.test.example` to `.env.test` and modify as needed (though defaults should work out of the box).
 
+### Test environment
+
+- Copy `.env.test.example` to `.env.test` before running the suite; this file contains the test database URL and any overrides that should never touch your development data.
+- `npm test`, `npm run check`, `npm run test:cov`, and CI's `npm run test:ci` all inject `TEST_ENV_FILE=.env.test` (see the scripts block in `package.json`), so Vitest always loads the test-only env file rather than `.env`.
+- `vitest.setup.ts` imports `tests/setup-env.ts`, which reads the file pointed at by `TEST_ENV_FILE` (defaulting to `.env.test`) via `dotenv` and refuses to start if `DATABASE_URL` is not a localhost URL ending in `_test`.
+- The default `.env.test` points to `postgresql://postgres:postgres@localhost:5432/postgres_test?schema=public`, keeping migrations and fixtures isolated from your dev database.
+- If you need extra test-only knobs, add them to `.env.test`—the guard script strips `RATE_LIMIT_REDIS_URL` so tests stay fast and hermetic.
+
 ### Test Database
 
 Tests use a separate database (`starter_test`) to avoid conflicts with development data. The test setup automatically:
