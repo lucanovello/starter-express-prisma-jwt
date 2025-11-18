@@ -26,7 +26,7 @@ async function main() {
   server.headersTimeout = cfg.HTTP_SERVER_HEADERS_TIMEOUT_MS;
   server.requestTimeout = cfg.HTTP_SERVER_REQUEST_TIMEOUT_MS;
 
-  let stopSessionCleanup = scheduleSessionCleanup();
+  let stopSessionCleanup = scheduleSessionCleanup({ logger });
   let shutdownInitiated = false;
   let forceExitTimer: NodeJS.Timeout | null = null;
   let detachFatalHandlers: () => void = () => {};
