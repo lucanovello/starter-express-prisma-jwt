@@ -125,14 +125,13 @@ npm run test:cov
 npm run check
 ```
 
-### Test Configuration
+### Test environment
 
-Tests automatically use `.env.test` which points to a separate `starter_test` database. The default configuration works out of the box, but you can customize by copying:
-
-```bash
-cp .env.test.example .env.test
-# Then edit .env.test as needed
-```
+- Copy `.env.test.example` to `.env.test` so the suite can load the dedicated test database URL and any overrides you need.
+- The npm scripts that power `npm test`, `npm run check`, `npm run test:cov`, and CI's `npm run test:ci` all export `TEST_ENV_FILE=.env.test`, ensuring Vitest never consumes your `.env` file.
+- `vitest.setup.ts` imports `tests/setup-env.ts`, which calls `dotenv` with the file pointed to by `TEST_ENV_FILE` (falling back to `.env.test`) and refuses to proceed unless `DATABASE_URL` points at localhost and ends in `_test`.
+- The guard script also removes `RATE_LIMIT_REDIS_URL` so the suite sticks to the in-memory rate limiter and runs quickly.
+- Customize any other test-only values inside `.env.test`; development configuration stays untouched.
 
 ## Git Hooks
 
