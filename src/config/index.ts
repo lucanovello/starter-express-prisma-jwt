@@ -87,8 +87,6 @@ const EnvSchema = z
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
     SMTP_FROM: z.string().email().optional(),
-    OAUTH_GOOGLE_CLIENT_ID: z.string().optional(),
-    OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
     METRICS_ENABLED: z.string().optional(),
     METRICS_GUARD: z.enum(["none", "secret", "cidr"]).default("none"),
     METRICS_GUARD_SECRET: z.string().optional(),

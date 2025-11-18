@@ -50,7 +50,7 @@
 ### Excessive login lockouts
 
 1. Check auth rate limit configuration: `AUTH_LOGIN_MAX_ATTEMPTS`, `AUTH_LOGIN_LOCKOUT_MINUTES`, `AUTH_LOGIN_ATTEMPT_WINDOW_MINUTES`.
-2. To unblock specific users, delete their lockout keys (Prisma `Lockout` table) or flush Redis keys prefixed with `login_attempt`.
+2. To unblock specific users, delete their lockout keys (Prisma `LoginAttempt` table) or flush Redis keys prefixed with `login_attempt`.
 3. Review recent auth logs for brute force IPs and update upstream firewall/CDN rules.
 
 ### Rate limiting ignores forwarded client IP
