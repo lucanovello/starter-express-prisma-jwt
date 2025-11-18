@@ -32,18 +32,13 @@ describe("session management", () => {
 
     await request(app).post("/auth/register").send({ email, password }).expect(201);
 
-    const loginOne = await request(app)
-      .post("/auth/login")
-      .send({ email, password })
-      .expect(200);
-    const loginTwo = await request(app)
-      .post("/auth/login")
-      .send({ email, password })
-      .expect(200);
+    const loginOne = await request(app).post("/auth/login").send({ email, password }).expect(200);
+    const loginTwo = await request(app).post("/auth/login").send({ email, password }).expect(200);
 
     const accessToken = loginTwo.body.accessToken as string;
     const refreshToken = loginTwo.body.refreshToken as string;
 
+    // 1) Before logout-all, sessions list works
     const list = await request(app)
       .get("/auth/sessions")
       .set("Authorization", `Bearer ${accessToken}`)
@@ -55,16 +50,16 @@ describe("session management", () => {
     expect(current).toBeDefined();
     expect(typeof current.id).toBe("string");
 
+    // 2) Logout all sessions
     await request(app)
       .post("/auth/logout-all")
       .set("Authorization", `Bearer ${accessToken}`)
       .expect(204);
 
-    await request(app)
-      .post("/auth/refresh")
-      .send({ refreshToken })
-      .expect(401);
+    // 3) Refresh with old refresh token should fail
+    await request(app).post("/auth/refresh").send({ refreshToken }).expect(401);
 
+    // 4) Old access token should now also be rejected
     await request(app)
       .get("/auth/sessions")
       .set("Authorization", `Bearer ${accessToken}`)
