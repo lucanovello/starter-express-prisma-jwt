@@ -93,3 +93,6 @@ jobs:
           image-ref: starter-express-prisma-jwt:${{ github.sha }}
           severity: HIGH,CRITICAL
           exit-code: "1"
+          # Root manifests list devDependencies that are stripped from the runtime image,
+          # so skip them to avoid false positives while still scanning installed modules.
+          skip-files: /app/package.json,/app/package-lock.json
