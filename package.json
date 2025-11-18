@@ -105,6 +105,8 @@
     "js-yaml": "4.1.1",
     "@eslint/eslintrc": {
       "js-yaml": "4.1.1"
-    }
+    },
+    "cross-spawn": "^7.0.6",
+    "glob": "^11.1.0"
   }
 }
