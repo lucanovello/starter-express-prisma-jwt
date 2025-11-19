@@ -8,6 +8,8 @@ const RATE_ENV_VARS = [
   "RATE_LIMIT_REDIS_URL",
   "RATE_LIMIT_RPM",
   "RATE_LIMIT_RPM_AUTH",
+  "RATE_LIMIT_RPM_AUTH_REGISTER",
+  "RATE_LIMIT_RPM_AUTH_PASSWORD_RESET",
   "RATE_LIMIT_WINDOW_SEC",
   "TRUST_PROXY",
 ];
@@ -64,7 +66,7 @@ test("redis-backed rate limiting persists counters between requests", async () =
   const mod = await import("../src/app.js");
   const app = mod.default;
 
-  expect(stores.length).toBe(2);
+  expect(stores.length).toBe(4);
 
   const agent = request(app);
   await agent.get("/health").expect(200);
