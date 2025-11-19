@@ -51,13 +51,13 @@ npm run dev
 
 ### Production compose highlights
 
-- `compose.prod.yml` builds the `runner` stage from `Dockerfile`, then starts Postgres and Redis with health checks before the API.
+- `compose.prod.yml` builds the `runner` stage from `Dockerfile`, loads environment variables from `.env.production` (or whatever `COMPOSE_ENV_FILE` you set), and gates API start-up on healthy Postgres/Redis containers. `docker compose --env-file .env.production -f compose.prod.yml up -d --build` works without editing the compose file.
 - The API container keeps `npx prisma migrate deploy` as its entrypoint before `node dist/index.js`.
-- Redis is mandatory in production to back rate limiting (`RATE_LIMIT_REDIS_URL`); the container exits unhealthy if Redis fails.
-- **Before first deploy**: Copy `.env.production.example` to `.env.production` and replace all placeholder values with strong secrets. Use `openssl rand -base64 32` to generate JWT secrets and metrics secrets.
-- Pass your hardened `.env.production` file via `--env-file` or inject secrets through your orchestrator; `.env` and `.env.production` remain git-ignored.
-- `METRICS_GUARD` and `METRICS_GUARD_SECRET` are now **required** in production when `METRICS_ENABLED=true`; weak defaults have been removed to prevent security misconfigurations.
-- Keep `METRICS_ENABLED=false` unless you have a guarded Prometheus scraper; when enabling, also set `METRICS_GUARD` + secret/allowlist.
+- Postgres credentials now live in `.env.production` as `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`. Those values configure the bundled `db` service **and** are stitched into `DATABASE_URL` automatically when it is left unset, so there are no hard-coded DSNs in the compose file.
+- Redis is mandatory in production to back rate limiting. The `redis` service requires `REDIS_PASSWORD`, enables append-only persistence on the `redis_data` volume, and the API defaults `RATE_LIMIT_REDIS_URL` to `redis://:<REDIS_PASSWORD>@redis:6379/0` to ensure authenticated connections. Rotate the password by updating `.env.production`, restarting Redis, and ensuring any managed instance (if you migrate away from the bundled service) is configured with the same secret.
+- **Before first deploy**: Copy `.env.production.example` to `.env.production` and replace all placeholder values with strong secrets (`POSTGRES_*`, `REDIS_PASSWORD`, JWTs, metrics guard secrets, SMTP, etc.). Use `openssl rand -base64 32` (or your secret manager) for high-entropy values.
+- Pass your hardened `.env.production` file via `--env-file` (or set `COMPOSE_ENV_FILE` to a different path) or inject secrets through your orchestrator; `.env` and `.env.production` remain git-ignored.
+- Keep `METRICS_ENABLED=false` unless you have a guarded Prometheus scraper. When you do enable metrics, use either `METRICS_GUARD=secret` + `METRICS_GUARD_SECRET` or `METRICS_GUARD=cidr` + `METRICS_GUARD_ALLOWLIST`. Runtime config validation enforces the right combination so the compose file no longer blocks deployments when metrics stay disabled.
 
 Operational runbooks live in `docs/ops/runbook.md`. Kubernetes starter manifests are available in `docs/ops/kubernetes` if you prefer deploying outside Docker Compose.
 
@@ -111,7 +111,11 @@ Tests use a separate database (`starter_test`) to avoid conflicts with developme
 
 | Name                                | Example                                              | Notes                                                                                                  |
 | ----------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| COMPOSE_ENV_FILE                   | .env.production                                      | Path loaded into each service via `env_file`; set to match the `--env-file` you pass to Compose.       |
 | DATABASE_URL                        | postgres://user:pass@host:5432/starter?schema=public | Postgres DSN                                                                                           |
+| POSTGRES_USER                      | starter                                              | Username for the bundled Postgres service (also used when building the default `DATABASE_URL`).        |
+| POSTGRES_PASSWORD                  | prod-db-secret                                       | Password for the bundled Postgres service.                                                             |
+| POSTGRES_DB                        | starter                                              | Database created by the bundled Postgres service; set to your managed DB when not running it locally.  |
 | JWT_ACCESS_SECRET                   | dev-access                                           | required                                                                                               |
 | JWT_REFRESH_SECRET                  | dev-refresh                                          | required                                                                                               |
 | JWT_ACCESS_EXPIRY                   | 15m                                                  | default 15m                                                                                            |
@@ -119,7 +123,8 @@ Tests use a separate database (`starter_test`) to avoid conflicts with developme
 | PORT                                | 3000                                                 | optional                                                                                               |
 | CORS_ORIGINS                        | https://app.example.com                              | comma-separated allowlist, required in production                                                      |
 | TRUST_PROXY                         | 1                                                    | Express trust proxy setting (`loopback` default; set to hop count or CIDR list for your load balancer) |
-| RATE_LIMIT_REDIS_URL                | redis://cache:6379                                   | required in production                                                                                 |
+| RATE_LIMIT_REDIS_URL                | redis://:very-secret@redis:6379/0                    | Required in production; defaults to `redis://:<REDIS_PASSWORD>@redis:6379/0` when using compose.       |
+| REDIS_PASSWORD                      | prod-redis-secret                                    | Password enforced by the bundled Redis service and baked into the default Redis URL.                   |
 | METRICS_ENABLED                     | false                                                | Enable Prometheus `/metrics`; defaults off in production                                               |
 | METRICS_GUARD                       | secret                                               | Use `secret` (shared header) or `cidr` (IP allowlist) in prod                                          |
 | METRICS_GUARD_SECRET                | prod-metrics-secret                                  | Required when `METRICS_GUARD=secret`; clients send `x-metrics-secret`                                  |
@@ -323,8 +328,8 @@ echo $RATE_LIMIT_REDIS_URL
 redis-cli -u $RATE_LIMIT_REDIS_URL ping
 
 # 3. Check Redis is running in compose setup
-docker compose -f compose.prod.yml ps redis
-docker compose -f compose.prod.yml logs redis
+docker compose --env-file .env.production -f compose.prod.yml ps redis
+docker compose --env-file .env.production -f compose.prod.yml logs redis
 ```
 
 #### Email Service Issues
@@ -486,4 +491,3 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 ```
 
 ```
-
