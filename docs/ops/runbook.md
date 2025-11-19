@@ -7,6 +7,45 @@
 - **Cache / rate limit**: Redis 7 used for login attempt tracking and shared rate limiting.
 - **Health probes**: `/health` (liveness) and `/ready` (readiness, fails when Postgres is unavailable).
 
+## Environment & secrets
+
+- Production deployments load runtime configuration from `.env.production` (or the path you set in `COMPOSE_ENV_FILE`). Always run Docker Compose with `--env-file .env.production -f compose.prod.yml ...` so both CLI interpolation and containers receive the same variables.
+- Copy `.env.production.example`, set strong `POSTGRES_*`, `REDIS_PASSWORD`, JWT secrets, SMTP creds, and metrics guard variables, then keep the file outside version control. If you rename the file, set `COMPOSE_ENV_FILE=/path/to/file` in your shell or inside the env file itself so `compose.prod.yml` can load it.
+
+### Postgres credentials
+
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` configure the bundled `db` service. When `DATABASE_URL` is unset, `compose.prod.yml` builds the DSN from those values and points it at the `db` hostname automatically.
+- When targeting a managed database, leave the `db` service stopped, point `DATABASE_URL` at your provider, and keep `POSTGRES_*` in sync for local migrations.
+- **Rotating credentials (bundled Postgres):**
+  1. Update `.env.production` with the new `POSTGRES_PASSWORD` and matching `DATABASE_URL`.
+  2. Apply the change inside the container:
+     ```bash
+     docker compose --env-file .env.production -f compose.prod.yml exec db psql -U <POSTGRES_USER>
+     ALTER USER <POSTGRES_USER> WITH PASSWORD '<POSTGRES_PASSWORD>';
+     \q
+     ```
+     Replace the placeholders with the values you just configured.
+  3. Restart the API so Prisma picks up the new DSN.
+- **Rotating credentials (managed Postgres):**
+  1. Rotate the secret via your provider.
+  2. Update `.env.production` (`POSTGRES_*` if you still run the container locally, plus `DATABASE_URL`).
+  3. Re-run `docker compose --env-file .env.production -f compose.prod.yml up -d app` to reload the env.
+
+### Redis credentials & persistence
+
+- `REDIS_PASSWORD` is mandatory; the Redis container refuses to start without it and writes append-only data to the `redis_data` volume (file `/data/appendonly.aof`). The API defaults `RATE_LIMIT_REDIS_URL` to `redis://:<REDIS_PASSWORD>@redis:6379/0` so every rate limiter client authenticates.
+- Backups: snapshot `/data/appendonly.aof` from the `redis_data` volume for point-in-time recovery or rely on managed Redis persistence if you move off the bundled service.
+- **Rotating the password (bundled Redis):**
+  1. Update `.env.production` with the new `REDIS_PASSWORD` (and adjust `RATE_LIMIT_REDIS_URL` only if you override the default).
+  2. Restart Redis with `docker compose --env-file .env.production -f compose.prod.yml up -d redis`.
+  3. Restart the API (`docker compose --env-file .env.production -f compose.prod.yml up -d app`) so the new URL is picked up.
+  4. If you have other clients (e.g., scripts) talking to the same Redis instance, update their credentials simultaneously.
+- **Rotating the password (managed Redis):**
+  1. Rotate the secret in your provider dashboard.
+  2. Update `.env.production` (`REDIS_PASSWORD` and `RATE_LIMIT_REDIS_URL`).
+  3. Restart the API deployment to pick up the new DSN.
+- For manual inspection inside the container, use `docker compose --env-file .env.production -f compose.prod.yml exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" info persistence'`.
+
 ## Dashboards & metrics
 
 - **API**: `/metrics` (enable via `METRICS_ENABLED=true`); scrape with Prometheus + Grafana.
@@ -20,13 +59,13 @@
 
 1. Check database container/service:
    ```bash
-   docker compose -f compose.prod.yml ps db
-   docker compose -f compose.prod.yml logs db --tail 50
+   docker compose --env-file .env.production -f compose.prod.yml ps db
+   docker compose --env-file .env.production -f compose.prod.yml logs db --tail 50
    ```
 2. If managed Postgres, verify status and connection limits in provider console.
 3. For container deployments, restart the service:
    ```bash
-   docker compose -f compose.prod.yml up -d db
+   docker compose --env-file .env.production -f compose.prod.yml up -d db
    ```
 4. Confirm readiness of API:
    ```bash
@@ -34,15 +73,16 @@
    ```
 5. After restoration, re-run schema migrations if needed:
    ```bash
-   docker compose -f compose.prod.yml exec app npx prisma migrate deploy
+   docker compose --env-file .env.production -f compose.prod.yml exec app npx prisma migrate deploy
    ```
 
 ### Redis unavailable / rate limiter failing open
 
 1. Inspect Redis logs and health:
    ```bash
-   docker compose -f compose.prod.yml ps redis
-   docker compose -f compose.prod.yml logs redis --tail 50
+   docker compose --env-file .env.production -f compose.prod.yml ps redis
+   docker compose --env-file .env.production -f compose.prod.yml logs redis --tail 50
+   docker compose --env-file .env.production -f compose.prod.yml exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" ping'
    ```
 2. No production-safe fallback exists; keep the application in maintenance mode until Redis is restored.
 3. After Redis recovers, confirm lockout keys expire (default TTL minutes from env variables) and watch for replayed requests.
@@ -69,10 +109,10 @@
 
 ## Operational tasks
 
-- **Deploy**: Build image, push, then `docker compose -f compose.prod.yml up -d`.
+- **Deploy**: Build image, push, then `docker compose --env-file .env.production -f compose.prod.yml up -d`.
 - **Schema migrations**: run `npx prisma migrate deploy` (already executed on container start).
-- **Backups**: Configure Postgres WAL backups / snapshots; for Redis persistent deployments, enable AOF.
-- **Secrets rotation**: Rotate JWT secrets and Redis/Postgres credentials; update deployment environment variables and restart.
+- **Backups**: Configure Postgres WAL backups / snapshots and capture the `postgres_data` + `redis_data` volumes (Redis stores `appendonly.aof` there) or rely on managed backups.
+- **Secrets rotation**: Rotate JWT secrets plus the `POSTGRES_*` / `REDIS_PASSWORD` values; update `.env.production`, follow the steps above to apply DB/Redis changes, then restart containers.
 - **Scaling**: For Kubernetes, adjust Deployment replicas or apply HPA configuration (see `docs/ops/kubernetes` samples).
 
 ## Environment toggles
