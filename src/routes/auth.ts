@@ -9,6 +9,10 @@ import {
   VerifyEmailSchema,
 } from "../dto/auth.js";
 import { AppError } from "../lib/errors.js";
+import {
+  authRegisterRateLimit,
+  authRequestPasswordResetRateLimit,
+} from "../middleware/authRateLimits.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { validateRequest } from "../middleware/validate.js";
 import * as Auth from "../services/authService.js";
@@ -25,23 +29,28 @@ import type {
 export const auth = Router();
 
 // Register
-auth.post("/register", validateRequest({ body: RegisterSchema }), async (req, res, next) => {
-  try {
-    const dto = req.body as RegisterInput;
-    const result = await Auth.register(dto);
-    const response: Record<string, unknown> = {
-      emailVerificationRequired: result.emailVerificationRequired,
-    };
-    const { accessToken, refreshToken } = result;
-    if (typeof accessToken === "string" && typeof refreshToken === "string") {
-      response.accessToken = accessToken;
-      response.refreshToken = refreshToken;
+auth.post(
+  "/register",
+  authRegisterRateLimit,
+  validateRequest({ body: RegisterSchema }),
+  async (req, res, next) => {
+    try {
+      const dto = req.body as RegisterInput;
+      const result = await Auth.register(dto);
+      const response: Record<string, unknown> = {
+        emailVerificationRequired: result.emailVerificationRequired,
+      };
+      const { accessToken, refreshToken } = result;
+      if (typeof accessToken === "string" && typeof refreshToken === "string") {
+        response.accessToken = accessToken;
+        response.refreshToken = refreshToken;
+      }
+      res.status(201).json(response);
+    } catch (err) {
+      next(err);
     }
-    res.status(201).json(response);
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 // Login
 auth.post("/login", validateRequest({ body: LoginSchema }), async (req, res, next) => {
@@ -93,6 +102,7 @@ auth.post("/verify-email", validateRequest({ body: VerifyEmailSchema }), async (
 // Request password reset
 auth.post(
   "/request-password-reset",
+  authRequestPasswordResetRateLimit,
   validateRequest({ body: RequestPasswordResetSchema }),
   async (req, res, next) => {
     try {

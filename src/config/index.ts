@@ -77,6 +77,8 @@ const EnvSchema = z
     RATE_LIMIT_RPM: z.coerce.number().default(600),
     RATE_LIMIT_WINDOW_SEC: z.coerce.number().default(900),
     RATE_LIMIT_RPM_AUTH: z.coerce.number().default(120),
+    RATE_LIMIT_RPM_AUTH_REGISTER: z.coerce.number().default(0.33),
+    RATE_LIMIT_RPM_AUTH_PASSWORD_RESET: z.coerce.number().default(0.2),
     RATE_LIMIT_REDIS_URL: z
       .string()
       .url("RATE_LIMIT_REDIS_URL must be a valid URL (e.g. redis://:pass@host:6379)")

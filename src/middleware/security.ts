@@ -17,6 +17,11 @@ import {
   markRateLimitRedisUnhealthy,
 } from "../lib/rateLimitHealth.js";
 
+import {
+  setAuthRegisterRateLimit,
+  setAuthRequestPasswordResetRateLimit,
+} from "./authRateLimits.js";
+
 import type { Express, Request, RequestHandler } from "express";
 
 type RateLimitMiddleware = ReturnType<typeof rateLimit>;
@@ -82,6 +87,8 @@ export async function registerSecurity(app: Express): Promise<SecurityTeardown> 
 
   let globalStore: RedisStore | undefined;
   let authStore: RedisStore | undefined;
+  let authRegisterStore: RedisStore | undefined;
+  let authRequestPasswordResetStore: RedisStore | undefined;
   const redisClients: Array<{ client: RedisClient; teardown: () => void }> = [];
 
   if (cfg.rateLimitStore.type === "redis") {
@@ -137,6 +144,14 @@ export async function registerSecurity(app: Express): Promise<SecurityTeardown> 
         prefix: "rate-limit:auth",
         sendCommand,
       });
+      authRegisterStore = new RedisStore({
+        prefix: "rate-limit:auth-register",
+        sendCommand,
+      });
+      authRequestPasswordResetStore = new RedisStore({
+        prefix: "rate-limit:auth-request-password-reset",
+        sendCommand,
+      });
     }
   } else if (isProd) {
     throw new Error("Misconfigured rate limit store: production requires Redis backing store");
@@ -168,6 +183,30 @@ export async function registerSecurity(app: Express): Promise<SecurityTeardown> 
         standardHeaders: true,
         legacyHeaders: false,
         store: authStore,
+      }),
+    ),
+  );
+
+  setAuthRegisterRateLimit(
+    asRequestHandler(
+      rateLimit({
+        windowMs,
+        max: toMax(cfg.RATE_LIMIT_RPM_AUTH_REGISTER),
+        standardHeaders: true,
+        legacyHeaders: false,
+        store: authRegisterStore,
+      }),
+    ),
+  );
+
+  setAuthRequestPasswordResetRateLimit(
+    asRequestHandler(
+      rateLimit({
+        windowMs,
+        max: toMax(cfg.RATE_LIMIT_RPM_AUTH_PASSWORD_RESET),
+        standardHeaders: true,
+        legacyHeaders: false,
+        store: authRequestPasswordResetStore,
       }),
     ),
   );

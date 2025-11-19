@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, expect, test } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 import request from "supertest";
 
 import { prisma } from "../src/lib/prisma.js";
@@ -7,15 +7,21 @@ import { resetDb } from "./utils/db.js";
 type UserRole = "USER" | "ADMIN";
 
 let app: any;
+const ORIGINAL_ENV = { ...process.env };
 
 beforeAll(async () => {
   process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET ?? "test-access";
   process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? "test-refresh";
   process.env.JWT_ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY ?? "15m";
   process.env.JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY ?? "7d";
+  process.env.RATE_LIMIT_RPM_AUTH_REGISTER = process.env.RATE_LIMIT_RPM_AUTH_REGISTER ?? "120";
 
   const mod = await import("../src/app.js");
   app = mod.default;
+});
+
+afterAll(() => {
+  process.env = { ...ORIGINAL_ENV };
 });
 
 beforeEach(async () => {
