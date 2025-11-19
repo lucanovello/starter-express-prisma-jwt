@@ -1,0 +1,6 @@
+# npm CLI's own dependencies in node:20.19-alpine
+# We don't invoke npm or glob CLI at runtime, and our app's node_modules
+# use cross-spawn >=7.0.6 and glob >=11.1.0.
+
+CVE-2024-21538
+CVE-2025-64756
