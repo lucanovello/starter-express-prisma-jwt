@@ -20,6 +20,7 @@ Minimal, batteries-included REST starter:
 - [Configuration](#env)
 - [Deployment](#run-in-docker-prod-like)
 - [Contributing](#contributing)
+- [Roles & Admin Access](#roles--admin-access)
 - [Security](#security-policy)
 - [Changelog](#changelog)
 - [Troubleshooting](#troubleshooting)
@@ -55,7 +56,7 @@ npm run dev
 - The API container keeps `npx prisma migrate deploy` as its entrypoint before `node dist/index.js`.
 - Postgres credentials now live in `.env.production` as `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`. Those values configure the bundled `db` service **and** are stitched into `DATABASE_URL` automatically when it is left unset, so there are no hard-coded DSNs in the compose file.
 - Redis is mandatory in production to back rate limiting. The `redis` service requires `REDIS_PASSWORD`, enables append-only persistence on the `redis_data` volume, and the API defaults `RATE_LIMIT_REDIS_URL` to `redis://:<REDIS_PASSWORD>@redis:6379/0` to ensure authenticated connections. Rotate the password by updating `.env.production`, restarting Redis, and ensuring any managed instance (if you migrate away from the bundled service) is configured with the same secret.
-- **Before first deploy**: Copy `.env.production.example` to `.env.production` and replace all placeholder values with strong secrets (`POSTGRES_*`, `REDIS_PASSWORD`, JWTs, metrics guard secrets, SMTP, etc.). Use `openssl rand -base64 32` (or your secret manager) for high-entropy values.
+- **Before first deploy**: Copy `.env.production.example` to `.env.production` and replace all placeholder values with strong secrets (`POSTGRES_*`, `REDIS_PASSWORD`, JWTs, metrics guard secrets, SMTP, etc.). Use `openssl rand -base64 32` (or your secret manager) for high-entropy values. Store production SMTP/API credentials in a secrets manager or locked-down `.env.production` outside git, and rotate them immediately if exposed (see [SECURITY.md](./SECURITY.md)).
 - Pass your hardened `.env.production` file via `--env-file` (or set `COMPOSE_ENV_FILE` to a different path) or inject secrets through your orchestrator; `.env` and `.env.production` remain git-ignored.
 - Keep `METRICS_ENABLED=false` unless you have a guarded Prometheus scraper. When you do enable metrics, use either `METRICS_GUARD=secret` + `METRICS_GUARD_SECRET` or `METRICS_GUARD=cidr` + `METRICS_GUARD_ALLOWLIST`. Runtime config validation enforces the right combination so the compose file no longer blocks deployments when metrics stay disabled.
 
@@ -340,10 +341,12 @@ docker compose --env-file .env.production -f compose.prod.yml logs redis
 
 ```bash
 # 1. Check if email service is configured
-# In development, emails log to console by default (no SMTP needed)
+# In development, emails log to console by default (no SMTP needed).
 # In production, the console fallback redacts tokens and logs a warning; configure SMTP for delivery.
+# Use a secrets manager or restricted `.env.production` for SMTP credentials, enable MFA on the provider,
+# and rotate credentials if they are ever shared or checked in. Report leaks per SECURITY.md.
 
-# 2. For SMTP testing, configure these variables in .env:
+# 2. For SMTP testing in dev only, configure these variables in .env:
 SMTP_HOST=smtp.ethereal.email
 SMTP_PORT=587
 SMTP_SECURE=false
@@ -351,6 +354,7 @@ SMTP_USER=<YOUR_ETHEREAL_USERNAME>
 SMTP_PASS=<YOUR_ETHEREAL_PASSWORD>
 
 # 3. Get free test credentials at https://ethereal.email
+# Do not reuse Ethereal or other test credentials in production. Use provider-issued SMTP users in prod.
 ```
 
 #### Authentication Token Errors
@@ -466,6 +470,14 @@ We welcome contributions! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for:
 - Testing guidelines
 - Pull request process
 - Commit message conventions
+
+## Roles & Admin Access
+
+- Roles available: `USER` (default) and `ADMIN` (required for `/protected/admin/ping` and any future admin-only endpoints).
+- Promote a user by email: `npm run user:set-role -- --email user@example.com --role ADMIN` (use `--id <user-id>` if email is not unique in your data source).
+- Demote or fix incorrect access the same way: `npm run user:set-role -- --email user@example.com --role USER`.
+- The CLI uses your current environment configuration and Prisma client; point `DATABASE_URL` (or your `.env.production` via `COMPOSE_ENV_FILE`) at the target database **before** running it.
+- Keep ADMIN accounts scarce and audited; rotate tokens/sessions for demoted users if they held elevated access.
 
 ## Security Policy
 

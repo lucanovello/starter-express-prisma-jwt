@@ -12,6 +12,14 @@
 - Production deployments load runtime configuration from `.env.production` (or the path you set in `COMPOSE_ENV_FILE`). Always run Docker Compose with `--env-file .env.production -f compose.prod.yml ...` so both CLI interpolation and containers receive the same variables.
 - Copy `.env.production.example`, set strong `POSTGRES_*`, `REDIS_PASSWORD`, JWT secrets, SMTP creds, and metrics guard variables, then keep the file outside version control. If you rename the file, set `COMPOSE_ENV_FILE=/path/to/file` in your shell or inside the env file itself so `compose.prod.yml` can load it.
 
+### Roles & admin access
+
+- Roles: `USER` (default) and `ADMIN` (required for `/protected/admin/ping` and any admin-only routes you add).
+- Promote or demote with the CLI (ensure `DATABASE_URL` targets the right database first):
+  - `npm run user:set-role -- --email user@example.com --role ADMIN`
+  - `npm run user:set-role -- --id <user-id> --role USER` (prefer `--id` if email is duplicated downstream)
+- The user must already exist; the script uses the Prisma client and your current env (.env/.env.production). Keep ADMIN assignments rare, audit them regularly, and rotate tokens/sessions after demotion.
+
 ### Postgres credentials
 
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` configure the bundled `db` service. When `DATABASE_URL` is unset, `compose.prod.yml` builds the DSN from those values and points it at the `db` hostname automatically.
@@ -45,6 +53,12 @@
   2. Update `.env.production` (`REDIS_PASSWORD` and `RATE_LIMIT_REDIS_URL`).
   3. Restart the API deployment to pick up the new DSN.
 - For manual inspection inside the container, use `docker compose --env-file .env.production -f compose.prod.yml exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" info persistence'`.
+
+### SMTP credentials
+
+- Use provider-issued SMTP users in production; keep credentials in a secrets manager or a restricted `.env.production` outside git, and enable MFA on the email provider.
+- Ethereal or other disposable credentials are for development only and should never be reused in staging/production.
+- Rotate SMTP credentials periodically or immediately after any suspected leak, update `.env.production`/secret manager entries, and redeploy. If credentials leak, follow the disclosure steps in `SECURITY.md` and record where the exposure occurred.
 
 ## Dashboards & metrics
 
