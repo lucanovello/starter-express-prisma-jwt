@@ -15,6 +15,7 @@ spec:
       labels:
         app: starter-api
     spec:
+      serviceAccountName: starter-api
       containers:
         - name: api
           image: ghcr.io/your-org/starter-express-prisma-jwt:replace-with-tag

@@ -1,0 +1,30 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: starter-api
+    honor_labels: true
+    metrics_path: /metrics
+    scheme: http
+    # Use CIDR guard + NetworkPolicy/ingress allowlists so Prometheus can reach /metrics without exposing it publicly.
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - replace-me
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: starter-api
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: http
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - target_label: job
+        replacement: starter-api
+    # If you keep METRICS_GUARD=secret, inject the x-metrics-secret header through an ingress snippet or sidecar proxy
+    # that appends the header only for Prometheus traffic.

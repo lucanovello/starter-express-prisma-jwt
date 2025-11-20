@@ -66,6 +66,7 @@ If you want Docker to run everything for you, `docker compose --profile dev-app 
 - Keep `METRICS_ENABLED=false` unless you have a guarded Prometheus scraper. When you do enable metrics, use either `METRICS_GUARD=secret` + `METRICS_GUARD_SECRET` or `METRICS_GUARD=cidr` + `METRICS_GUARD_ALLOWLIST`. Runtime config validation enforces the right combination so the compose file no longer blocks deployments when metrics stay disabled.
 
 Operational runbooks live in `docs/ops/runbook.md`. Kubernetes starter manifests are available in `docs/ops/kubernetes` if you prefer deploying outside Docker Compose.
+For Kubernetes, inject `DATABASE_URL` and `RATE_LIMIT_REDIS_URL` via Secrets (see `secret.yaml`) and point `TRUST_PROXY` at your ingress hop count or CIDRs so audit logs and rate limits honor real client IPs.
 
 ## Test
 
@@ -172,8 +173,9 @@ docker run --rm -p 3000:3000   -e DATABASE_URL=postgres://...   -e JWT_ACCESS_SE
 
 ## Observability
 
-- Prometheus: `GET /metrics` (non-production by default; enable in prod via `METRICS_ENABLED=true`). In production, choose either `METRICS_GUARD=secret` with a shared `x-metrics-secret` header or `METRICS_GUARD=cidr` with `METRICS_GUARD_ALLOWLIST`. Unauthorized requests return `401`/`403` without exposing metrics.
+- Prometheus: `GET /metrics` (non-production by default; enable in prod via `METRICS_ENABLED=true`). In production, choose either `METRICS_GUARD=secret` with a shared `x-metrics-secret` header or `METRICS_GUARD=cidr` with `METRICS_GUARD_ALLOWLIST`. Unauthorized requests return `401`/`403` without exposing metrics. Example scrape config and a starter Grafana dashboard live in `docs/ops/observability`.
 - Common series: `http_requests_total`, `http_request_duration_seconds`, Node process metrics.
+- Behind ingress controllers, set `TRUST_PROXY` to the hop count (e.g. `1` for ingress only, `2` for LB + ingress) or to CIDR ranges for your proxy IPs so logs and rate limiting see the right client address. If you expose `/metrics` through ingress, add an allowlist/auth annotation or enforce a NetworkPolicy so only Prometheus reaches it; keep `METRICS_ENABLED=false` until one of those guards exists.
 - Version: `GET /version` returns `{ version, gitSha, buildTime }` from the build stamp.
 
 ## Responses
