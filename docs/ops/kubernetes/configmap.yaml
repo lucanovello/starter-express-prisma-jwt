@@ -7,8 +7,10 @@ data:
   NODE_ENV: "production"
   PORT: "3000"
   CORS_ORIGINS: "https://app.example.com"
+  TRUST_PROXY: "1" # set to hop count or CIDRs for your ingress
   METRICS_ENABLED: "false"
   METRICS_GUARD: "secret"
+  METRICS_GUARD_ALLOWLIST: "10.0.0.0/8" # replace when using METRICS_GUARD=cidr
   AUTH_EMAIL_VERIFICATION_REQUIRED: "true"
   AUTH_LOGIN_MAX_ATTEMPTS: "5"
   AUTH_LOGIN_LOCKOUT_MINUTES: "15"

@@ -62,9 +62,17 @@
 - Ethereal or other disposable credentials are for development only and should never be reused in staging/production.
 - Rotate SMTP credentials periodically or immediately after any suspected leak, update `.env.production`/secret manager entries, and redeploy. If credentials leak, follow the disclosure steps in `SECURITY.md` and record where the exposure occurred.
 
+## Kubernetes deployment notes
+
+- Manifests live in `docs/ops/kubernetes`: `deployment.yaml` (set `serviceAccountName`), `service.yaml`, `configmap.yaml`, `secret.yaml`, `ingress.yaml`, `poddisruptionbudget.yaml`, and `serviceaccount.yaml` (with optional RBAC). Adjust namespaces, ingress class, hostnames, and TLS secret names before applying.
+- Keep `DATABASE_URL`, `RATE_LIMIT_REDIS_URL`, and JWT secrets in Kubernetes Secrets (optionally sourced from an external secrets operator) and wire them into the Deployment via `envFrom` as shown in `secret.yaml`. ConfigMap stays for non-sensitive defaults.
+- Set `TRUST_PROXY` for your ingress topology so rate limiting and CIDR guards see client IPs: `1` for a single ingress hop, `2` when traffic passes through a load balancer + ingress controller, or CIDR ranges if you pin ingress controller node IPs.
+- Protect `/metrics` three ways: (1) prefer `METRICS_GUARD=cidr` with `METRICS_GUARD_ALLOWLIST` covering your Prometheus scrape nodes/namespace, (2) add ingress allowlists/auth annotations (see `ingress.yaml` placeholders) so only monitoring traffic reaches `/metrics`, and/or (3) apply a NetworkPolicy like `networkpolicy-metrics.yaml` that limits port 3000 to ingress controller pods and your monitoring namespace. Keep `METRICS_ENABLED=false` until one of these is in place.
+- The PodDisruptionBudget keeps at least one replica running during voluntary disruptions; align `spec.selector.matchLabels` with the Deployment `app` label if you rename it.
+
 ## Dashboards & metrics
 
-- **API**: `/metrics` (enable via `METRICS_ENABLED=true`); scrape with Prometheus + Grafana.
+- **API**: `/metrics` (enable via `METRICS_ENABLED=true`); scrape with Prometheus + Grafana. Starter configs live under `docs/ops/observability` (`prometheus-scrape.yaml` and `grafana-dashboard.json`) and assume either `METRICS_GUARD=cidr` or ingress/NetworkPolicy allowlisting for Prometheus.
 - **Database**: pg_stat_activity / connections dashboard (e.g., RDS Performance Insights, Grafana Postgres mixin).
 - **Redis**: Monitor `redis_commands_processed`, `evicted_keys`, memory usage.
 - **Errors & latency**: Centralised logs (Pino JSON) aggregated via ELK/Stackdriver/CloudWatch depending on hosting.
@@ -122,6 +130,7 @@
    - `METRICS_GUARD=secret` -> clients must send `x-metrics-secret` header equal to `METRICS_GUARD_SECRET`.
    - `METRICS_GUARD=cidr` -> confirm caller IP within `METRICS_GUARD_ALLOWLIST`.
 3. Check app logs for `metrics_guard` warnings.
+4. In Kubernetes, confirm Prometheus traffic is allowed by ingress allowlists/auth and any NetworkPolicy rules (see `ingress.yaml` and `networkpolicy-metrics.yaml`).
 
 ## Operational tasks
 

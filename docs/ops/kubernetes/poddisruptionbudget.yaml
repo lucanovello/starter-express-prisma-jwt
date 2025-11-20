@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: starter-api
+  namespace: replace-me
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: starter-api
