@@ -1,5 +1,7 @@
 # Ops Runbook
 
+Operational checklist I keep for my own deployments of this starter—feel free to adapt it if you fork the repo.
+
 ## Service overview
 
 - **API**: RESTful Express service on port `3000`; depends on Postgres and Redis.
