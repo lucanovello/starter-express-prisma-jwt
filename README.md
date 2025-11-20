@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
 
-Minimal, batteries-included REST starter:
+Minimal, batteries-included REST starter I maintain for my own projects (feel free to fork, but I'm not accepting outside contributions right now):
 
 - Auth: access/refresh JWT + rotation
 - Prisma/Postgres sessions
@@ -19,7 +19,6 @@ Minimal, batteries-included REST starter:
 - [API Documentation](#api-docs--clients)
 - [Configuration](#env)
 - [Deployment](#run-in-docker-prod-like)
-- [Contributing](#contributing)
 - [Roles & Admin Access](#roles--admin-access)
 - [Security](#security-policy)
 - [Changelog](#changelog)
@@ -44,16 +43,16 @@ npm run dev
 
 If you want Docker to run everything for you, `docker compose --profile dev-app up` starts the API alongside the bundled Postgres and Redis services. The app container installs dependencies, runs `prisma migrate deploy` against `DATABASE_URL` (defaulting to the compose Postgres service), and then launches `npm run dev` so migrations stay in sync automatically as long as you commit new Prisma migrations.
 
-> **First time here?** Check out [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed setup instructions.
+> **First time here?** Skim `docs/DEVELOPMENT.md` for deeper setup notes.
 
 ## Environment matrix
 
-| Environment               | Entry point                                                                   | Backing services                                             | Notes                                                                                                                   |
-| ------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Local development         | `npm run dev` after `docker compose up -d db`                                 | Postgres 15 via `docker-compose.yml`                         | `.env` (copy from `.env.example`) with relaxed defaults; runs in watch mode.                                            |
+| Environment               | Entry point                                                                   | Backing services                                             | Notes                                                                                                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local development         | `npm run dev` after `docker compose up -d db`                                 | Postgres 15 via `docker-compose.yml`                         | `.env` (copy from `.env.example`) with relaxed defaults; runs in watch mode.                                                                            |
 | Local dev (full compose)  | `docker compose --profile dev-app up`                                         | Postgres 15 + Redis 7 via `docker-compose.yml`               | Loads `.env` (or `COMPOSE_ENV_FILE`) into the container, installs deps, applies `prisma migrate deploy`, then runs dev server against compose services. |
-| Continuous integration    | `.github/workflows/ci.yml`                                                    | Postgres 15 service container                                | Workflow runs `npm run typecheck && npm run lint && npm run test:ci` plus OpenAPI build; uses `.env.test`.              |
-| Production docker compose | `docker compose --env-file .env.production -f compose.prod.yml up -d --build` | App, Postgres, Redis with health checks and ordered start-up | Requires strong JWT secrets, explicit `CORS_ORIGINS`, `RATE_LIMIT_REDIS_URL`, and enables readiness probe via `/ready`. |
+| Continuous integration    | `.github/workflows/ci.yml`                                                    | Postgres 15 service container                                | Workflow runs `npm run typecheck && npm run lint && npm run test:ci` plus OpenAPI build; uses `.env.test`.                                              |
+| Production docker compose | `docker compose --env-file .env.production -f compose.prod.yml up -d --build` | App, Postgres, Redis with health checks and ordered start-up | Requires strong JWT secrets, explicit `CORS_ORIGINS`, `RATE_LIMIT_REDIS_URL`, and enables readiness probe via `/ready`.                                 |
 
 ### Production compose highlights
 
@@ -118,11 +117,11 @@ Tests use a separate database (`starter_test`) to avoid conflicts with developme
 
 | Name                                | Example                                              | Notes                                                                                                  |
 | ----------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| COMPOSE_ENV_FILE                   | .env.production                                      | Path loaded into each service via `env_file`; set to match the `--env-file` you pass to Compose.       |
+| COMPOSE_ENV_FILE                    | .env.production                                      | Path loaded into each service via `env_file`; set to match the `--env-file` you pass to Compose.       |
 | DATABASE_URL                        | postgres://user:pass@host:5432/starter?schema=public | Postgres DSN                                                                                           |
-| POSTGRES_USER                      | starter                                              | Username for the bundled Postgres service (also used when building the default `DATABASE_URL`).        |
-| POSTGRES_PASSWORD                  | prod-db-secret                                       | Password for the bundled Postgres service.                                                             |
-| POSTGRES_DB                        | starter                                              | Database created by the bundled Postgres service; set to your managed DB when not running it locally.  |
+| POSTGRES_USER                       | starter                                              | Username for the bundled Postgres service (also used when building the default `DATABASE_URL`).        |
+| POSTGRES_PASSWORD                   | prod-db-secret                                       | Password for the bundled Postgres service.                                                             |
+| POSTGRES_DB                         | starter                                              | Database created by the bundled Postgres service; set to your managed DB when not running it locally.  |
 | JWT_ACCESS_SECRET                   | dev-access                                           | required                                                                                               |
 | JWT_REFRESH_SECRET                  | dev-refresh                                          | required                                                                                               |
 | JWT_ACCESS_EXPIRY                   | 15m                                                  | default 15m                                                                                            |
@@ -457,28 +456,12 @@ node dist/index.js
 
 ### Getting Help
 
-Still stuck? Here's where to get help:
+This starter is maintained for my own projects, so there is no public support channel. If you fork it, lean on the included docs:
 
-- **Documentation:**
-  - [CONTRIBUTING.md](./CONTRIBUTING.md) - Development setup and guidelines
-  - [SECURITY.md](./SECURITY.md) - Security policy and best practices
-  - [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) - Detailed developer guide
-  - [docs/RENOVATE.md](./docs/RENOVATE.md) - Dependency automation
-  - [docs/ops/runbook.md](./docs/ops/runbook.md) - Operational guidance
-
-- **Support:**
-  - [Issues](https://github.com/lucanovello/starter-express-prisma-jwt/issues) - Bug reports and feature requests
-  - [Discussions](https://github.com/lucanovello/starter-express-prisma-jwt/discussions) - Questions and community help
-
-## Contributing
-
-We welcome contributions! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for:
-
-- Development setup and workflow
-- Coding standards and best practices
-- Testing guidelines
-- Pull request process
-- Commit message conventions
+- [SECURITY.md](./SECURITY.md) - Security policy and best practices
+- [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) - Detailed developer guide
+- [docs/RENOVATE.md](./docs/RENOVATE.md) - Dependency automation
+- [docs/ops/runbook.md](./docs/ops/runbook.md) - Operational guidance
 
 ## Roles & Admin Access
 

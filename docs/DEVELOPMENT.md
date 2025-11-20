@@ -1,6 +1,6 @@
 # Development Setup Guide
 
-Complete guide for setting up your local development environment.
+Complete guide for setting up the local development environment I use for this personal starter (feel free to fork and adapt).
 
 ## Prerequisites
 
@@ -341,5 +341,4 @@ npm install
 
 ## Getting Help
 
-- **Issues:** https://github.com/lucanovello/starter-express-prisma-jwt/issues
-- **Discussions:** https://github.com/lucanovello/starter-express-prisma-jwt/discussions
+This repo is maintained for my own work, so there isn't a public support queue. When you fork it, lean on the existing docs (`README.md`, `docs/ops/runbook.md`, `docs/RENOVATE.md`, `SECURITY.md`) or adapt the workflow to fit your needs.
