@@ -29,7 +29,8 @@
     "test": "cross-env TEST_ENV_FILE=.env.test vitest run",
     "test:ci": "cross-env TEST_ENV_FILE=.env.test vitest run --coverage",
     "test:cov": "cross-env TEST_ENV_FILE=.env.test vitest run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "user:set-role": "node scripts/users/set-role.mjs"
   },
   "engines": {
     "node": ">=20.19 <21"
