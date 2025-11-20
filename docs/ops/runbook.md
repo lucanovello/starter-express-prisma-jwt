@@ -6,6 +6,8 @@
 - **Database**: Postgres 15 with Prisma migrations. Migrate on boot via `npx prisma migrate deploy`.
 - **Cache / rate limit**: Redis 7 used for login attempt tracking and shared rate limiting.
 - **Health probes**: `/health` (liveness) and `/ready` (readiness, fails when Postgres is unavailable).
+- **Bare-metal entrypoint**: `npm run start:prod` builds, runs `prisma migrate deploy` against `DATABASE_URL`, and starts `node dist/index.js`. Use `npm run start:runtime` only when migrations are applied separately (for example managed pipelines).
+- **Full-stack dev compose**: `docker compose --profile dev-app up` starts the API alongside the bundled Postgres and Redis services. The container installs dependencies, runs `prisma migrate deploy`, and then `npm run dev`, so keep Prisma migrations committed to keep the compose database in sync.
 
 ## Environment & secrets
 
@@ -124,7 +126,7 @@
 ## Operational tasks
 
 - **Deploy**: Build image, push, then `docker compose --env-file .env.production -f compose.prod.yml up -d`.
-- **Schema migrations**: run `npx prisma migrate deploy` (already executed on container start).
+- **Schema migrations**: run `npx prisma migrate deploy` (already executed on container start, via `npm run start:prod` for bare metal, and by the `dev-app` compose profile when it boots).
 - **Backups**: Configure Postgres WAL backups / snapshots and capture the `postgres_data` + `redis_data` volumes (Redis stores `appendonly.aof` there) or rely on managed backups.
 - **Secrets rotation**: Rotate JWT secrets plus the `POSTGRES_*` / `REDIS_PASSWORD` values; update `.env.production`, follow the steps above to apply DB/Redis changes, then restart containers.
 - **Scaling**: For Kubernetes, adjust Deployment replicas or apply HPA configuration (see `docs/ops/kubernetes` samples).
