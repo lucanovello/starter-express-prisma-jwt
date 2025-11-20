@@ -36,9 +36,13 @@ npx prisma migrate deploy
 npm run dev
 # (Ensure you're using Node 20.x)
 # GET http://localhost:3000/health -> {"status":"ok"}
-# When you need a one-off production-style run:
-# npm start  # (prebuilds automatically and runs node dist/index.js)
+# When you need a one-off production-style run (bare metal/systemd/PaaS):
+# npm run start:prod  # builds, applies migrations, then runs node dist/index.js
+# Or spin up API + Postgres + Redis together in Docker:
+# docker compose --profile dev-app up
 ```
+
+If you want Docker to run everything for you, `docker compose --profile dev-app up` starts the API alongside the bundled Postgres and Redis services. The app container installs dependencies, runs `prisma migrate deploy` against `DATABASE_URL` (defaulting to the compose Postgres service), and then launches `npm run dev` so migrations stay in sync automatically as long as you commit new Prisma migrations.
 
 > **First time here?** Check out [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed setup instructions.
 
@@ -47,6 +51,7 @@ npm run dev
 | Environment               | Entry point                                                                   | Backing services                                             | Notes                                                                                                                   |
 | ------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Local development         | `npm run dev` after `docker compose up -d db`                                 | Postgres 15 via `docker-compose.yml`                         | `.env` (copy from `.env.example`) with relaxed defaults; runs in watch mode.                                            |
+| Local dev (full compose)  | `docker compose --profile dev-app up`                                         | Postgres 15 + Redis 7 via `docker-compose.yml`               | Loads `.env` (or `COMPOSE_ENV_FILE`) into the container, installs deps, applies `prisma migrate deploy`, then runs dev server against compose services. |
 | Continuous integration    | `.github/workflows/ci.yml`                                                    | Postgres 15 service container                                | Workflow runs `npm run typecheck && npm run lint && npm run test:ci` plus OpenAPI build; uses `.env.test`.              |
 | Production docker compose | `docker compose --env-file .env.production -f compose.prod.yml up -d --build` | App, Postgres, Redis with health checks and ordered start-up | Requires strong JWT secrets, explicit `CORS_ORIGINS`, `RATE_LIMIT_REDIS_URL`, and enables readiness probe via `/ready`. |
 
@@ -146,6 +151,8 @@ Tests use a separate database (`starter_test`) to avoid conflicts with developme
 Note: Example values are placeholders only. URLs use reserved domains and IP ranges (e.g., example.com, 203.0.113.0/24). No real credentials are stored in git.
 
 ## Run in Docker (prod-like)
+
+Bare metal or PaaS without the Docker entrypoint? Use `npm run start:prod` to mirror container boot: it builds the app, runs `prisma migrate deploy` against `DATABASE_URL`, then starts `node dist/index.js`. If your platform applies migrations separately, use `npm run start:runtime` to skip the migrate step.
 
 ```bash
 docker build -t starter-api .

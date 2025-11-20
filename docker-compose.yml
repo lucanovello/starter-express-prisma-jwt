@@ -1,4 +1,27 @@
 services:
+  app:
+    profiles:
+      - dev-app
+    image: node:20.19.0
+    working_dir: /app
+    command: sh -c "npm install && npx prisma generate && npx prisma migrate deploy && npm run dev"
+    env_file:
+      - ${COMPOSE_ENV_FILE:-.env}
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/starter?schema=public}
+      RATE_LIMIT_REDIS_URL: ${RATE_LIMIT_REDIS_URL:-redis://redis:6379/0}
+      PORT: ${PORT:-3000}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - app_node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
   db:
     image: postgres:15
     restart: unless-stopped
@@ -27,5 +50,7 @@ services:
       retries: 10
     profiles:
       - rate-limit
+      - dev-app
 volumes:
   postgres_data:
+  app_node_modules:
