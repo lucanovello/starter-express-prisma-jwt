@@ -23,6 +23,17 @@ Operational checklist I keep for my own deployments of this starter—feel free 
   - `npm run user:set-role -- --email user@example.com --role ADMIN`
   - `npm run user:set-role -- --id <user-id> --role USER` (prefer `--id` if email is duplicated downstream)
 - The user must already exist; the script uses the Prisma client and your current env (.env/.env.production). Keep ADMIN assignments rare, audit them regularly, and rotate tokens/sessions after demotion.
+- First-admin bootstrap (optional helper):
+  1. Register a user via `POST /auth/register` (or create via Prisma).
+  2. Promote it: `npm run bootstrap:first-admin -- --email admin@example.com` (or `npm run user:set-role -- --email admin@example.com --role ADMIN`).
+  3. Verify with a bearer token at `GET /protected/admin/ping`.
+  4. SQL alternative:
+
+     ```bash
+     npx prisma db execute --stdin <<'SQL'
+     UPDATE "User" SET role = 'ADMIN' WHERE email = 'admin@example.com';
+     SQL
+     ```
 
 ### Postgres credentials
 
