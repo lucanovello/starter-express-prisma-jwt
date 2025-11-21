@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
 
-Minimal, batteries-included REST starter I maintain for my own projects (feel free to fork, but I'm not accepting outside contributions right now):
+Minimal, batteries-included REST starter for new Express/Prisma/JWT projects. Fork it or click **Use this template** on GitHub to spin up your own API quickly.
 
 - Auth: access/refresh JWT + rotation
 - Prisma/Postgres sessions
@@ -13,6 +13,7 @@ Minimal, batteries-included REST starter I maintain for my own projects (feel fr
 
 ## Table of Contents
 
+- [Using this template](#using-this-template)
 - [Quickstart](#quickstart-local-dev)
 - [Environment Matrix](#environment-matrix)
 - [Testing](#test)
@@ -23,6 +24,27 @@ Minimal, batteries-included REST starter I maintain for my own projects (feel fr
 - [Security](#security-policy)
 - [Changelog](#changelog)
 - [Troubleshooting](#troubleshooting)
+
+## Using this template
+
+- **Create your repo**: On GitHub, choose **Use this template** (or fork) to make your own copy, then clone it locally.
+- **Copy env files for each stage**:
+  - `.env.example` -> `.env` for local development
+  - `.env.test.example` -> `.env.test` for the test suite (`npm test`, `npm run check`, CI)
+  - `.env.production.example` -> `.env.production` for production and `compose.prod.yml`
+  Replace every placeholder with project-specific secrets: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `POSTGRES_*` or `DATABASE_URL`, `REDIS_PASSWORD`/`RATE_LIMIT_REDIS_URL`, `CORS_ORIGINS`, and any metrics guard secrets (`METRICS_GUARD_SECRET` or `METRICS_GUARD_ALLOWLIST`).
+- **Bootstrap the app** (see [Quickstart](#quickstart-local-dev) for details):
+
+  ```bash
+  npm install
+  cp .env.example .env
+  docker compose up -d db
+  npx prisma generate
+  npx prisma migrate deploy
+  npm run dev
+  ```
+
+  For production-like runs, use the compose commands in the [Environment matrix](#environment-matrix) or [Run in Docker (prod-like)](#run-in-docker-prod-like).
 
 ## Quickstart (local dev)
 
@@ -42,6 +64,8 @@ npm run dev
 ```
 
 If you want Docker to run everything for you, `docker compose --profile dev-app up` starts the API alongside the bundled Postgres and Redis services. The app container installs dependencies, runs `prisma migrate deploy` against `DATABASE_URL` (defaulting to the compose Postgres service), and then launches `npm run dev` so migrations stay in sync automatically as long as you commit new Prisma migrations.
+
+`cp .env.test.example .env.test` prepares the test suite (`npm run check`, `npm test`), and `.env.production.example` documents the production settings used by `compose.prod.yml`. All example secrets are placeholders; replace every JWT secret, database credential, Redis password/URL, CORS allowlist, and metrics guard secret before you deploy.
 
 > **First time here?** Skim `docs/DEVELOPMENT.md` for deeper setup notes.
 
@@ -90,7 +114,7 @@ npm run check
 - `npm test`, `npm run check`, `npm run test:cov`, and CI's `npm run test:ci` all inject `TEST_ENV_FILE=.env.test` (see the scripts block in `package.json`), so Vitest always loads the test-only env file rather than `.env`.
 - `vitest.setup.ts` imports `tests/setup-env.ts`, which reads the file pointed at by `TEST_ENV_FILE` (defaulting to `.env.test`) via `dotenv` and refuses to start if `DATABASE_URL` is not a localhost URL ending in `_test`.
 - The default `.env.test` points to `postgresql://postgres:postgres@localhost:5432/postgres_test?schema=public`, keeping migrations and fixtures isolated from your dev database.
-- If you need extra test-only knobs, add them to `.env.test`—the guard script strips `RATE_LIMIT_REDIS_URL` so tests stay fast and hermetic.
+- If you need extra test-only knobs, add them to `.env.test`; the guard script strips `RATE_LIMIT_REDIS_URL` so tests stay fast and hermetic.
 
 ### Test Database
 
@@ -114,6 +138,8 @@ Tests use a separate database (`starter_test`) to avoid conflicts with developme
 - `GET /ready` -> `200 {"status":"ready"}` when DB (and Redis when configured) respond, else `503 {"error":{"message":"Not Ready","code":"NOT_READY"}}` or `503 {"error":{"message":"Redis not ready","code":"REDIS_NOT_READY"}}`
 
 ## Env
+
+Environment defaults live in the example files: `.env.example` (local dev), `.env.test.example` (tests), and `.env.production.example` (production/`compose.prod.yml`). Copy them to `.env`, `.env.test`, and `.env.production` respectively, and replace placeholder secrets before running anything outside local dev: JWT secrets, Postgres credentials (`POSTGRES_*` or `DATABASE_URL`), Redis password/URL, CORS allowlist, and any metrics guard secrets.
 
 | Name                                | Example                                              | Notes                                                                                                  |
 | ----------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -456,7 +482,7 @@ node dist/index.js
 
 ### Getting Help
 
-This starter is maintained for my own projects, so there is no public support channel. If you fork it, lean on the included docs:
+This starter is provided as-is as a template; external support and upstream PR triage are limited. If you fork it, lean on the included docs:
 
 - [SECURITY.md](./SECURITY.md) - Security policy and best practices
 - [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) - Detailed developer guide
