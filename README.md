@@ -20,6 +20,7 @@ Minimal, batteries-included REST starter for new Express/Prisma/JWT projects. Fo
 - [API Documentation](#api-docs--clients)
 - [Configuration](#env)
 - [Deployment](#run-in-docker-prod-like)
+- [Bootstrapping your first admin user](#bootstrapping-your-first-admin-user)
 - [Roles & Admin Access](#roles--admin-access)
 - [Security](#security-policy)
 - [Changelog](#changelog)
@@ -488,6 +489,44 @@ This starter is provided as-is as a template; external support and upstream PR t
 - [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) - Detailed developer guide
 - [docs/RENOVATE.md](./docs/RENOVATE.md) - Dependency automation
 - [docs/ops/runbook.md](./docs/ops/runbook.md) - Operational guidance
+
+## Bootstrapping your first admin user
+
+This starter ships with an `ADMIN` role and sample admin-only route `GET /protected/admin/ping`. Use the steps below once per environment to seed the first admin, then fold admin creation into your own product flows (and delete the helper script if you don't need it).
+
+1. **Create a user** via the existing registration endpoint (or with Prisma). Example against local dev:
+
+   ```bash
+   curl -X POST http://localhost:3000/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"email":"admin@example.com","password":"ChangeMe123!"}'
+   ```
+
+   The response includes access/refresh tokens unless email verification is enforced; you can always log in later with `POST /auth/login` to fetch a fresh token.
+
+2. **Promote that user to ADMIN** using the Prisma-powered CLI (ensure `DATABASE_URL` points at the right database first):
+
+   ```bash
+   npm run user:set-role -- --email admin@example.com --role ADMIN
+   # convenience wrapper for the same promotion
+   npm run bootstrap:first-admin -- --email admin@example.com
+   ```
+
+   Prefer `--id <user-id>` when the email is duplicated downstream. If you prefer SQL to the helper scripts, Prisma exposes `npx prisma db execute --stdin`:
+
+   ```bash
+   npx prisma db execute --stdin <<'SQL'
+   UPDATE "User" SET role = 'ADMIN' WHERE email = 'admin@example.com';
+   SQL
+   ```
+
+3. **Verify access** by hitting the admin-only route with a bearer token:
+
+   ```bash
+   curl -H "Authorization: Bearer <access-token>" http://localhost:3000/protected/admin/ping
+   ```
+
+   The token can come from the register response or a later login; keep ADMIN assignments scarce and audited.
 
 ## Roles & Admin Access
 

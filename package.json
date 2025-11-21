@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "audit:ci": "audit-ci --config ./audit-ci.jsonc",
+    "bootstrap:first-admin": "node scripts/users/bootstrap-first-admin.mjs",
     "build": "tsc",
     "check": "npm run typecheck && npm run lint && npm run secrets:scan && npm run audit:ci && npm run test",
     "check:commit": "npm run typecheck && npm run lint && npm run secrets:scan",
