@@ -46,6 +46,7 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
       }
     }
 
+    // Hook for downstream auth models: this middleware asserts session validity before role-based checks on example routes.
     req.user = {
       id: user.id,
       role: user.role,

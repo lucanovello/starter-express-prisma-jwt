@@ -9,6 +9,7 @@ import { validateRequest } from "../middleware/validate.js";
 
 export const protectedRoutes = Router();
 
+// Template example: ADMIN-only health/ping endpoint. Downstream apps can replace/remove as real admin features evolve.
 protectedRoutes.get("/admin/ping", requireAuth, requireRole("ADMIN"), (_req, res) => {
   res.status(200).json({ status: "ok" });
 });

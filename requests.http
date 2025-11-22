@@ -1,0 +1,36 @@
+# Optional helper for manual API checks. Adjust/remove as routes or ports change in downstream projects.
+@baseUrl=http://localhost:3000
+@accessToken=<paste access token>
+@refreshToken=<paste refresh token>
+@userId=<paste user id>
+
+### Register a user (returns tokens unless email verification is required)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "dev@example.com",
+  "password": "Password123!",
+  "passwordConfirmation": "Password123!"
+}
+
+### Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "dev@example.com",
+  "password": "Password123!"
+}
+
+### Refresh access token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Example protected endpoint (owner or admin)
+GET {{baseUrl}}/protected/users/{{userId}}
+Authorization: Bearer {{accessToken}}
