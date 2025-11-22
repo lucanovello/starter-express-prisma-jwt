@@ -40,15 +40,15 @@
   "packageManager": "npm@10.8.2",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lucanovello/starter-express-prisma-jwt.git"
+    "url": "https://github.com/your-username/your-repo.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "Your Name",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/lucanovello/starter-express-prisma-jwt/issues"
+    "url": "https://github.com/your-username/your-repo/issues"
   },
-  "homepage": "https://github.com/lucanovello/starter-express-prisma-jwt#readme",
+  "homepage": "https://github.com/your-username/your-repo#readme",
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.1.0",
     "@prisma/client": "^6.17.1",
