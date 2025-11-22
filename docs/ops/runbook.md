@@ -1,6 +1,6 @@
 # Ops Runbook
 
-Operational checklist I keep for my own deployments of this starter—feel free to adapt it if you fork the repo.
+Operational checklist for running this starter template; adapt the commands and variables to your deployment environment.
 
 ## Service overview
 
@@ -71,6 +71,7 @@ Operational checklist I keep for my own deployments of this starter—feel free 
 
 ### SMTP credentials
 
+- Without `SMTP_HOST`, `SMTP_PORT`, and `SMTP_FROM`, the service falls back to console logging (tokens redacted in production); set the SMTP variables to deliver real emails.
 - Use provider-issued SMTP users in production; keep credentials in a secrets manager or a restricted `.env.production` outside git, and enable MFA on the email provider.
 - Ethereal or other disposable credentials are for development only and should never be reused in staging/production.
 - Rotate SMTP credentials periodically or immediately after any suspected leak, update `.env.production`/secret manager entries, and redeploy. If credentials leak, follow the disclosure steps in `SECURITY.md` and record where the exposure occurred.

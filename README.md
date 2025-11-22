@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
 
-Minimal, batteries-included REST starter for new Express/Prisma/JWT projects. Fork it or click **Use this template** on GitHub to spin up your own API quickly.
+Minimal, batteries-included REST starter for new Express/Prisma/JWT projects. Use **Use this template** or fork to create your own API quickly. After templating, update the CI badge link above to point at your repository if you want your workflow status visible.
 
 - Auth: access/refresh JWT + rotation
 - Prisma/Postgres sessions
@@ -16,47 +16,43 @@ Minimal, batteries-included REST starter for new Express/Prisma/JWT projects. Fo
 - [Using this template](#using-this-template)
 - [Quickstart](#quickstart-local-dev)
 - [Environment Matrix](#environment-matrix)
-- [Testing](#test)
+- [Testing](#testing)
 - [API Documentation](#api-docs--clients)
 - [Configuration](#env)
+- [Email delivery](#email-delivery)
 - [Deployment](#run-in-docker-prod-like)
 - [Bootstrapping your first admin user](#bootstrapping-your-first-admin-user)
 - [Roles & Admin Access](#roles--admin-access)
+- [Renaming your project](#renaming-your-project)
 - [Security](#security-policy)
 - [Changelog](#changelog)
 - [Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ## Using this template
 
-- **Create your repo**: On GitHub, choose **Use this template** (or fork) to make your own copy, then clone it locally.
+- **Create your repo**: Choose **Use this template** (or fork) to make your copy, then clone locally.
 - **Copy env files for each stage**:
   - `.env.example` -> `.env` for local development
   - `.env.test.example` -> `.env.test` for the test suite (`npm test`, `npm run check`, CI)
   - `.env.production.example` -> `.env.production` for production and `compose.prod.yml`
-  Replace every placeholder with project-specific secrets: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `POSTGRES_*` or `DATABASE_URL`, `REDIS_PASSWORD`/`RATE_LIMIT_REDIS_URL`, `CORS_ORIGINS`, and any metrics guard secrets (`METRICS_GUARD_SECRET` or `METRICS_GUARD_ALLOWLIST`).
-- **Bootstrap the app** (see [Quickstart](#quickstart-local-dev) for details):
+  Replace every placeholder with project-specific secrets: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `POSTGRES_*` or `DATABASE_URL`, `REDIS_PASSWORD`/`RATE_LIMIT_REDIS_URL`, `CORS_ORIGINS`, metrics guards, and SMTP variables if you want real email delivery.
+- **Install dependencies with Node 20.19.0**: Use `nvm use` if available, then `npm install`.
+- **Set up the database and Prisma**: Start Postgres via Docker (`docker compose up -d db`), run `npx prisma generate`, then `npx prisma migrate deploy` to create schema tables.
+- **Start the API**: `npm run dev` (see [Quickstart](#quickstart-local-dev) for the exact sequence).
 
-  ```bash
-  npm install
-  cp .env.example .env
-  docker compose up -d db
-  npx prisma generate
-  npx prisma migrate deploy
-  npm run dev
-  ```
-
-  For production-like runs, use the compose commands in the [Environment matrix](#environment-matrix) or [Run in Docker (prod-like)](#run-in-docker-prod-like).
+For production-like runs, use the compose commands in the [Environment matrix](#environment-matrix) or [Run in Docker (prod-like)](#run-in-docker-prod-like).
 
 ## Quickstart (local dev)
 
 ```bash
 cp .env.example .env
+nvm use 20.19.0 # optional but recommended; aligns with .nvmrc and Dockerfile
+npm install
 docker compose up -d db
-npm i
 npx prisma generate
 npx prisma migrate deploy
 npm run dev
-# (Ensure you're using Node 20.x)
 # GET http://localhost:3000/health -> {"status":"ok"}
 # When you need a one-off production-style run (bare metal/systemd/PaaS):
 # npm run start:prod  # builds, applies migrations, then runs node dist/index.js
@@ -92,9 +88,11 @@ If you want Docker to run everything for you, `docker compose --profile dev-app 
 Operational runbooks live in `docs/ops/runbook.md`. Kubernetes starter manifests are available in `docs/ops/kubernetes` if you prefer deploying outside Docker Compose.
 For Kubernetes, inject `DATABASE_URL` and `RATE_LIMIT_REDIS_URL` via Secrets (see `secret.yaml`) and point `TRUST_PROXY` at your ingress hop count or CIDRs so audit logs and rate limits honor real client IPs.
 
-## Test
+## Testing
 
-### Local Testing
+**Prepare Postgres first:** start the local database service with `docker compose up -d db`, and copy `.env.test.example` to `.env.test` so the suite can load its own `_test` database URL.
+
+### Local testing
 
 ```bash
 # Run tests (uses .env.test for configuration)
@@ -111,19 +109,20 @@ npm run check
 
 ### Test environment
 
-- Copy `.env.test.example` to `.env.test` before running the suite; this file contains the test database URL and any overrides that should never touch your development data.
-- `npm test`, `npm run check`, `npm run test:cov`, and CI's `npm run test:ci` all inject `TEST_ENV_FILE=.env.test` (see the scripts block in `package.json`), so Vitest always loads the test-only env file rather than `.env`.
+- `.env.test` defaults to `postgresql://postgres:postgres@localhost:5432/starter_test?schema=public`. Tests create the `_test` database and apply Prisma migrations automatically before suites run, but Postgres must be reachable.
+- `npm test`, `npm run check`, `npm run test:cov`, and CI's `npm run test:ci` all export `TEST_ENV_FILE=.env.test`, so Vitest always loads the test-only env file rather than `.env`.
 - `vitest.setup.ts` imports `tests/setup-env.ts`, which reads the file pointed at by `TEST_ENV_FILE` (defaulting to `.env.test`) via `dotenv` and refuses to start if `DATABASE_URL` is not a localhost URL ending in `_test`.
-- The default `.env.test` points to `postgresql://postgres:postgres@localhost:5432/postgres_test?schema=public`, keeping migrations and fixtures isolated from your dev database.
-- If you need extra test-only knobs, add them to `.env.test`; the guard script strips `RATE_LIMIT_REDIS_URL` so tests stay fast and hermetic.
+- If you need extra test-only variables, add them to `.env.test`; the guard script strips `RATE_LIMIT_REDIS_URL` so tests stay fast and hermetic.
 
-### Test Database
+### Test database
 
-Tests use a separate database (`starter_test`) to avoid conflicts with development data. The test setup automatically:
-
-- Connects to `postgresql://postgres:postgres@localhost:5432/starter_test`
-- Resets the database between test suites
-- Uses in-memory rate limiting (no Redis required)
+- The test helpers create and migrate the `_test` database automatically, isolating tests from development data. If initialization fails (for example, Postgres was not running), start the container and rerun the suite.
+- To create the test database manually against the bundled Postgres service:
+  ```bash
+  docker compose up -d db
+  docker compose exec db psql -U postgres -c "CREATE DATABASE starter_test;"
+  ```
+- Rate limiting uses the in-memory store in tests; no Redis setup is required.
 
 ## API docs & clients
 
@@ -176,6 +175,24 @@ Environment defaults live in the example files: `.env.example` (local dev), `.en
 | HTTP_SERVER_KEEPALIVE_TIMEOUT_MS    | 5000                                                 | optional override, default 5s                                                                          |
 
 Note: Example values are placeholders only. URLs use reserved domains and IP ranges (e.g., example.com, 203.0.113.0/24). No real credentials are stored in git.
+
+## Email delivery
+
+- **Default behavior:** When `SMTP_HOST`, `SMTP_PORT`, or `SMTP_FROM` are missing, the service falls back to console logging. In development it logs token hints to help with manual verification; in production the fallback redacts tokens and warns that SMTP is not configured.
+- **Automatic SMTP switching:** Providing `SMTP_HOST`, `SMTP_PORT`, and `SMTP_FROM` switches delivery to SMTP. Add `SMTP_USER` and `SMTP_PASS` when your provider requires authentication, and set `SMTP_SECURE=true` when your host expects TLS on connect.
+- **Where to configure:** Put SMTP settings in `.env.production` for real delivery, and optionally in `.env` if you want to exercise real emails in development instead of console logs.
+- **Example (generic SMTP provider such as SendGrid or Mailgun):**
+
+  ```env
+  SMTP_HOST=smtp.yourprovider.com
+  SMTP_PORT=587
+  SMTP_SECURE=false
+  SMTP_USER=<provider-username-or-apikey>
+  SMTP_PASS=<provider-password-or-token>
+  SMTP_FROM=noreply@example.com
+  ```
+
+  Use the host/user/pass provided by your email vendor; port 587 with `SMTP_SECURE=false` fits most TLS-enabled SMTP gateways.
 
 ## Run in Docker (prod-like)
 
@@ -536,6 +553,13 @@ This starter ships with an `ADMIN` role and sample admin-only route `GET /protec
 - The CLI uses your current environment configuration and Prisma client; point `DATABASE_URL` (or your `.env.production` via `COMPOSE_ENV_FILE`) at the target database **before** running it.
 - Keep ADMIN accounts scarce and audited; rotate tokens/sessions for demoted users if they held elevated access.
 
+## Renaming your project
+
+- Update `package.json` `"name"` (and repository/homepage links) plus the CI badge URL near the top of this README so it points at your repository.
+- Adjust database names if desired: change `POSTGRES_DB` and any `DATABASE_URL` values in `.env`, `.env.test`, `.env.production`, and `compose.prod.yml` when you want something other than the default `starter`/`starter_test`.
+- If you publish container images, change the example tag `starter-api` and the `image: app:prod` entry in `compose.prod.yml` to your preferred registry/repository names.
+- Run a quick search for `starter-express-prisma-jwt` or `starter` to catch any remaining references (for example in docs, badges, and build logs).
+
 ## Security Policy
 
 Security is a top priority. Please review [SECURITY.md](./SECURITY.md) for:
@@ -555,8 +579,4 @@ All notable changes are documented in [CHANGELOG.md](./CHANGELOG.md), following 
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
-
-```
-
-```
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details. Projects created from this template can keep MIT or swap in an alternative license that fits their needs; update your fork accordingly.
