@@ -63,12 +63,14 @@ const EnvSchema = z
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().default(3000),
     DATABASE_URL: z.string(),
+    // Change these from any defaults before deploying; short or reused secrets weaken JWT integrity.
     JWT_ACCESS_SECRET: z.string().min(32, "JWT access secret must be at least 32 characters long"),
     JWT_REFRESH_SECRET: z
       .string()
       .min(32, "JWT refresh secret must be at least 32 characters long"),
     JWT_ACCESS_EXPIRY: z.string().default("15m"),
     JWT_REFRESH_EXPIRY: z.string().default("7d"),
+    // Production requires explicit origins; missing/mismatched values will block browser requests.
     CORS_ORIGINS: z.string().optional(),
     TRUST_PROXY: z.string().default("loopback"),
     LOG_LEVEL: z
