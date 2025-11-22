@@ -1,10 +1,10 @@
 # Development Setup Guide
 
-Complete guide for setting up the local development environment I use for this personal starter (feel free to fork and adapt).
+Complete guide for setting up the local development environment for this starter template.
 
 ## Prerequisites
 
-- **Node.js**: 20.19.0 (specified in `.nvmrc`)
+- **Node.js**: 20.19.0 (specified in `.nvmrc` and used by the Dockerfile)
 - **Docker**: For running Postgres and Redis locally
 - **Git**: For version control
 
@@ -37,8 +37,11 @@ npm install
 ### 2. Environment Configuration
 
 ```bash
-# Copy example environment file
+# Copy example environment files
 cp .env.example .env
+cp .env.test.example .env.test  # required for the test suite
+# Optional: document production settings locally without committing secrets
+# cp .env.production.example .env.production
 
 # Edit .env with your configuration
 # Most defaults work for local development, but you should change:
@@ -110,7 +113,7 @@ curl http://localhost:3000/version
 
 ## Testing Setup
 
-Tests use a separate database to avoid conflicts with development data.
+Tests use a separate database to avoid conflicts with development data. Start Postgres first (`docker compose up -d db`) and ensure `.env.test` exists so the suite can create and migrate its own `_test` database.
 
 ### Run Tests
 
@@ -128,6 +131,12 @@ npm run check
 ### Test environment
 
 - Copy `.env.test.example` to `.env.test` so the suite can load the dedicated test database URL and any overrides you need.
+- The default test DSN is `postgresql://postgres:postgres@localhost:5432/starter_test?schema=public`. The helpers create the `_test` database and apply Prisma migrations automatically as long as Postgres is reachable. To create it manually against the bundled Postgres service:
+
+  ```bash
+  docker compose exec db psql -U postgres -c "CREATE DATABASE starter_test;"
+  ```
+
 - The npm scripts that power `npm test`, `npm run check`, `npm run test:cov`, and CI's `npm run test:ci` all export `TEST_ENV_FILE=.env.test`, ensuring Vitest never consumes your `.env` file.
 - `vitest.setup.ts` imports `tests/setup-env.ts`, which calls `dotenv` with the file pointed to by `TEST_ENV_FILE` (falling back to `.env.test`) and refuses to proceed unless `DATABASE_URL` points at localhost and ends in `_test`.
 - The guard script also removes `RATE_LIMIT_REDIS_URL` so the suite sticks to the in-memory rate limiter and runs quickly.
@@ -341,4 +350,4 @@ npm install
 
 ## Getting Help
 
-This repo is maintained for my own work, so there isn't a public support queue. When you fork it, lean on the existing docs (`README.md`, `docs/ops/runbook.md`, `docs/RENOVATE.md`, `SECURITY.md`) or adapt the workflow to fit your needs.
+This template is provided as-is and does not ship with a public support queue. Lean on the existing docs (`README.md`, `docs/ops/runbook.md`, `docs/RENOVATE.md`, `SECURITY.md`) or adapt the workflow to fit your team.
