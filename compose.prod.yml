@@ -3,7 +3,7 @@ services:
     build:
       context: .
       target: runner
-    image: starter-express-prisma-jwt:prod
+    image: app:prod
     depends_on:
       db:
         condition: service_healthy
