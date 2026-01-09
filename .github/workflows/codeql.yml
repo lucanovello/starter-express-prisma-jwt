@@ -32,6 +32,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node (match repo)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:

@@ -41,10 +41,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version-file: .nvmrc
           cache: npm
+
       - run: npm ci
       - name: Secret scanning
         run: npm run secrets:scan
