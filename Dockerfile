@@ -1,10 +1,8 @@
 # ---- Base ----
 ARG NODE_VERSION=24.12.0
-ARG ALPINE_VERSION=3.20
-ARG GCOMPAT_VERSION=1.1.0-r4
-ARG PRISMA_CLI_VERSION=7.2.0
+# ARG ALPINE_VERSION=3.20  # remove (or keep, but it won't be used)
 
-FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS base
+FROM node:${NODE_VERSION}-alpine AS base
 WORKDIR /app
 
 # ---- Deps ----
@@ -39,7 +37,7 @@ RUN npm prune --omit=dev \
 # Keep Prisma CLI (dev dependency) so migrate deploy works at runtime.
 
 # ---- Runtime ----
-FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS runner
+FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S app && adduser -S app -G app
