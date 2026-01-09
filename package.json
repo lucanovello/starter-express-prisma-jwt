@@ -35,7 +35,7 @@
     "user:set-role": "node scripts/users/set-role.mjs"
   },
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=20.19 <21"
   },
   "packageManager": "npm@11.7.0",
   "repository": {

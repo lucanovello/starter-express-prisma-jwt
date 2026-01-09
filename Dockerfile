@@ -23,7 +23,7 @@ RUN npm install --omit=dev --ignore-scripts
 FROM base AS build
 ENV NODE_ENV=development
 # Dummy DB URL required by Prisma at build time; actual DB URL is injected at runtime
-ENV DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fsm_backend?schema=public
+ENV DATABASE_URL=postgresql://postgres:postgres@localhost:5432/starter_backend?schema=public
 COPY package*.json ./
 RUN npm install --ignore-scripts
 COPY .  .
@@ -33,7 +33,7 @@ RUN npx prisma generate && npm run build
 FROM base AS prune
 ENV NODE_ENV=production
 # Prisma needs DATABASE_URL even just to generate the client
-ENV DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fsm_backend? schema=public
+ENV DATABASE_URL=postgresql://postgres:postgres@localhost:5432/starter_backend? schema=public
 ARG PRISMA_CLI_VERSION
 COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
