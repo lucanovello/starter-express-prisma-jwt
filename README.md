@@ -36,8 +36,8 @@ Minimal, batteries-included REST starter for new Express/Prisma/JWT projects. Us
   - `.env.example` -> `.env` for local development
   - `.env.test.example` -> `.env.test` for the test suite (`npm test`, `npm run check`, CI)
   - `.env.production.example` -> `.env.production` for production and `compose.prod.yml`
-  Replace every placeholder with project-specific secrets: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `POSTGRES_*` or `DATABASE_URL`, `REDIS_PASSWORD`/`RATE_LIMIT_REDIS_URL`, `CORS_ORIGINS`, metrics guards, and SMTP variables if you want real email delivery.
-- **Install dependencies with Node 20.19.0**: Use `nvm use` if available, then `npm install`.
+    Replace every placeholder with project-specific secrets: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `POSTGRES_*` or `DATABASE_URL`, `REDIS_PASSWORD`/`RATE_LIMIT_REDIS_URL`, `CORS_ORIGINS`, metrics guards, and SMTP variables if you want real email delivery.
+- **Install dependencies with Node 24.12.0**: Use `nvm use` if available, then `npm install`.
 - **Set up the database and Prisma**: Start Postgres via Docker (`docker compose up -d db`), run `npx prisma generate`, then `npx prisma migrate deploy` to create schema tables.
 - **Start the API**: `npm run dev` (see [Quickstart](#quickstart-local-dev) for the exact sequence).
 
@@ -47,7 +47,7 @@ For production-like runs, use the compose commands in the [Environment matrix](#
 
 ```bash
 cp .env.example .env
-nvm use 20.19.0 # optional but recommended; aligns with .nvmrc and Dockerfile
+nvm use 24.12.0 # optional but recommended; aligns with .nvmrc and Dockerfile
 npm install
 docker compose up -d db
 npx prisma generate
@@ -349,7 +349,7 @@ rm -rf node_modules/.cache
 npm run typecheck
 
 # 3. Verify Node version
-node --version  # Should be 20.19.0 or compatible with 20.x
+node --version  # Should be 24.12.0 or compatible
 ```
 
 #### Port Already in Use

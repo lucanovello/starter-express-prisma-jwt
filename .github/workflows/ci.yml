@@ -11,10 +11,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       NODE_ENV: test
       TEST_ENV_FILE: .env.test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/starter_test?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fsm_backend_test?schema=public
       JWT_ACCESS_SECRET: test_access_secret_please_change
       JWT_REFRESH_SECRET: test_refresh_secret_please_change
       JWT_ACCESS_EXPIRY: 15m
@@ -29,7 +30,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: starter_test
+          POSTGRES_DB: fsm_backend_test
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=10s
@@ -42,15 +43,15 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.19.0
+          node-version: 20.x
           cache: npm
       - run: npm ci
       - name: Secret scanning
         run: npm run secrets:scan
       - name: Dependency vulnerability audit
         run: npm run audit:ci
-      - name: Prisma migrate & generate
-        run: npx prisma migrate deploy && npx prisma generate
+      - name: Prisma migrate
+        run: npx prisma migrate deploy
       - name: Static checks (types + lint)
         run: npm run typecheck && npm run lint
       - name: Tests (coverage + thresholds)
@@ -74,7 +75,7 @@ jobs:
         with:
           dockerfile: Dockerfile
       - name: Lint GitHub workflows with actionlint
-        uses: docker://rhysd/actionlint:1.7.6
+        uses: docker://rhysd/actionlint:1.7.9
         with:
           args: "-color"
 
@@ -86,17 +87,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Docker image for scanning
-        run: docker build -t starter-express-prisma-jwt:${{ github.sha }} .
+        run: docker build --build-arg DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fsm_backend_test?schema=public -t fsm-backend:${{ github.sha }} .
 
       - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: image
-          image-ref: starter-express-prisma-jwt:${{ github.sha }}
+          image-ref: fsm-backend:${{ github.sha }}
           severity: HIGH,CRITICAL
           exit-code: "1"
-          # Root manifests list devDependencies that are stripped from the runtime image,
-          # so skip them to avoid false positives while still scanning installed modules.
           skip-files: /app/package.json,/app/package-lock.json
-          # New: tell Trivy to use the ignore file in the repo root
-          trivyignores: .trivyignore

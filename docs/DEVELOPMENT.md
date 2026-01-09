@@ -4,7 +4,7 @@ Complete guide for setting up the local development environment for this starter
 
 ## Prerequisites
 
-- **Node.js**: 20.19.0 (specified in `.nvmrc` and used by the Dockerfile)
+- **Node.js**: 24.12.0 (specified in `.nvmrc` and used by the Dockerfile)
 - **Docker**: For running Postgres and Redis locally
 - **Git**: For version control
 
