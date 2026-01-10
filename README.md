@@ -1,15 +1,13 @@
 # Express + Prisma + JWT API
 
-[![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
-
 Production-style REST API built with Express 5 + TypeScript, Prisma/Postgres, Zod validation, JWT auth (access + rotating refresh), structured logging, and a small operational surface (health/ready/metrics/version).
 
-- Auth: access + refresh JWT, refresh rotation, DB-backed sessions
-- Validation: Zod (with OpenAPI generation)
+- Auth: access + refresh JWT, refresh rotation (reuse detection revokes all sessions), DB-backed sessions
+- Auth UX: optional email verification + password reset tokens (SMTP or dev console fallback)
 - Security: Helmet, CORS allowlist (required in production), rate limiting (Redis-backed in prod)
-- Observability: Pino logs + `/metrics`
+- Observability: Pino logs + `/metrics` (guarded)
 - Testing: Vitest + Supertest + isolated `_test` DB
-- Docker: local services + production-like compose
+- Docker: prod-like Compose (API + Postgres + Redis)
 
 ## Table of Contents
 
@@ -28,7 +26,7 @@ Production-style REST API built with Express 5 + TypeScript, Prisma/Postgres, Zo
 
 ## Requirements
 
-- **Node.js**: `>=24 <25` (see `package.json`)
+- **Node.js**: `>=20.19 <21` (see `package.json`)
 - **Docker**: recommended (Postgres for dev/test; Redis for prod-like)
 
 ## Quickstart (local dev)
@@ -38,11 +36,10 @@ cp .env.example .env
 cp .env.test.example .env.test
 npm install
 
-# start Postgres
-docker compose up -d db
+# start Postgres + generate Prisma client
+npm run setup:dev
 
-# Prisma
-npx prisma generate
+# apply migrations
 npx prisma migrate deploy
 
 # run API (watch mode)
@@ -54,8 +51,7 @@ curl http://localhost:3000/ready
 curl http://localhost:3000/version
 ```
 
-> Want the full stack locally (API + Postgres + Redis)?  
-> `docker compose --profile dev-app up` (uses `.env` / `COMPOSE_ENV_FILE`).
+Tip: `npm run dev:up` runs `setup:dev` then starts the API.
 
 ## Scripts
 
@@ -108,7 +104,7 @@ Key variables:
 - **CORS**: `CORS_ORIGINS` (required in production)
 - **Rate limiting**: `RATE_LIMIT_REDIS_URL` (required in production)
 - **Metrics**: `METRICS_ENABLED` + guard settings (`METRICS_GUARD`, `METRICS_GUARD_SECRET` / `METRICS_GUARD_ALLOWLIST`)
-- **Email (SMTP)**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` (+ optional auth/TLS vars)
+- **Email (SMTP)** (optional): `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` (+ optional `SMTP_USER`/`SMTP_PASS`/`SMTP_SECURE`)
 
 For the full list and defaults, use the example env files as the source of truth.
 
@@ -116,8 +112,33 @@ For the full list and defaults, use the example env files as the source of truth
 
 - JWT access tokens for API authorization
 - Rotating refresh tokens backed by DB sessions
+- Login lockout (by email + IP) after repeated failures (configurable)
 - Role model: `USER` and `ADMIN`
 - Admin-only sample route: `GET /protected/admin/ping`
+
+### Auth endpoints
+
+All auth routes are mounted under `/auth`:
+
+- `POST /auth/register` → create user
+  - If `AUTH_EMAIL_VERIFICATION_REQUIRED=true`: returns `{ emailVerificationRequired: true }` and sends a verification token.
+  - Otherwise: returns `{ emailVerificationRequired: false, accessToken, refreshToken }`.
+- `POST /auth/verify-email` → `{ token }` → `204`
+- `POST /auth/login` → `{ accessToken, refreshToken }`
+- `POST /auth/refresh` → rotates refresh token → `{ accessToken, refreshToken }`
+  - Reuse detection: if an old refresh token is replayed, all sessions for that user are revoked.
+- `POST /auth/logout` → `{ refreshToken }` → `204`
+- `GET /auth/sessions` (auth) → list sessions (includes “current”)
+- `POST /auth/logout-all` (auth) → revoke all sessions → `204`
+- `POST /auth/request-password-reset` → `{ email }` → `202 {"status":"ok"}`
+- `POST /auth/reset-password` → `{ token, password, passwordConfirmation }` → `204`
+
+### Email delivery behavior
+
+- If SMTP is configured (see `.env.test.example` / config schema), verification + password reset emails are sent via SMTP.
+- If SMTP is not configured:
+  - In `development`/`test`, tokens are logged to the console to keep local iteration easy.
+  - In `production`, tokens are _not_ logged; configure SMTP to complete verification/reset flows.
 
 Promote/demote a user:
 
@@ -187,9 +208,9 @@ Notes:
 
 ## Docs
 
-- Development notes: `docs/DEVELOPMENT.md`
 - Operational runbook: `docs/ops/runbook.md`
-- Security policy: `SECURITY.md`
+- Kubernetes manifests: `docs/ops/kubernetes/`
+- Observability assets (Prometheus scrape + Grafana dashboard): `docs/ops/observability/`
 
 ## License
 
