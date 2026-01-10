@@ -1,5 +1,7 @@
 # Express + Prisma + JWT API
 
+[![CI](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucanovello/starter-express-prisma-jwt/actions/workflows/ci.yml)
+
 Production-style REST API built with Express 5 + TypeScript, Prisma/Postgres, Zod validation, JWT auth (access + rotating refresh), structured logging, and a small operational surface (health/ready/metrics/version).
 
 - Auth: access + refresh JWT, refresh rotation (reuse detection revokes all sessions), DB-backed sessions
